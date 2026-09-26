@@ -594,6 +594,12 @@ window.abrirPerfilPublicoLobby = abrirPerfilPublicoLobby;
 async function entrarNoJogo() {
   const loadingScreen = document.getElementById('tela-loading');
   const menuScreen = document.getElementById('tela-menu');
+  // ETAPA 14 (World-First): a tela principal depois do login deixou de ser
+  // o dashboard (tela-menu) e passou a ser Universos. O dashboard continua
+  // existindo e sendo preparado normalmente (recursos, música, etc.) — ele
+  // só não é mais a tela ativa/inicial. Nenhum sistema foi removido, apenas
+  // a tela de entrada mudou.
+  const universosScreen = document.getElementById('tela-universos');
 
   if (!menuScreen) return;
 
@@ -603,13 +609,23 @@ async function entrarNoJogo() {
 
   if (loadingScreen) loadingScreen.classList.remove('active');
 
-  menuScreen.classList.add('active');
+  // tela-menu fica preparada (visível internamente) mas não como a tela ativa,
+  // pra manter compatível qualquer código que dependa dela existir no DOM.
   menuScreen.classList.remove('hidden');
 
   await garantirPerfilUsuario();
   await sincronizarEstadoDoServidor();
 
   updateResources();
+
+  if (universosScreen && typeof show === 'function') {
+    show('tela-universos');
+  } else {
+    // Fallback de segurança: se por algum motivo a tela de Universos não
+    // existir no DOM, preserva o comportamento antigo (vai pro dashboard).
+    menuScreen.classList.add('active');
+  }
+
   aplicarMusicaLobby(musicaLigada);
   setTimeout(showDailyLogin, 500);
 
@@ -3067,7 +3083,10 @@ async function aoVencerBatalha(bossId, moedas, diamantes) {
     if (compraSkill2Obrigatoria) {
       setTimeout(() => { show('tela-loja'); renderShop('skill2'); }, 250);
     } else {
-      show('tela-menu');
+      // ETAPA 14 (World-First): a Arena (tela-bosses) é o ponto de entrada da
+      // batalha vindo do mundo, então ao vencer volta pra lá (e não mais pro
+      // dashboard tela-menu, que deixou de ser o centro do jogo).
+      show('tela-bosses');
     }
   } catch (erro) {
     console.error('Erro ao confirmar vitória:', erro);
@@ -3077,7 +3096,7 @@ async function aoVencerBatalha(bossId, moedas, diamantes) {
   }
 }
 
-function aoPerderBatalha(){if(window.stopBossMusic)stopBossMusic();if(window.playDefeatSound)playDefeatSound();mostrarToast('☠ Derrota! Tente novamente.', 'defeat');show('tela-menu')}
+function aoPerderBatalha(){if(window.stopBossMusic)stopBossMusic();if(window.playDefeatSound)playDefeatSound();mostrarToast('☠ Derrota! Tente novamente.', 'defeat');show('tela-bosses')}
 function iniciarIntroDeLuta(boss){const overlay=document.getElementById('tela-fight-intro'),el=document.getElementById('fight-intro-numero');if(!overlay||!el){iniciarBatalha(boss,jogador,inventario,rarityColor(boss.rank));return}overlay.classList.remove('hidden');let seq=['3','2','1','FIGHT!'],i=0;const next=()=>{if(i>=seq.length){overlay.classList.add('hidden');iniciarBatalha(boss,jogador,inventario,rarityColor(boss.rank));return}el.textContent=seq[i++];setTimeout(next,500)};next()}
 // Pause
  document.getElementById('btn-pause').onclick=()=>{document.getElementById('modal-pause').classList.remove('hidden');if(typeof pausarBatalha==='function')pausarBatalha()};document.getElementById('btn-continuar').onclick=()=>{document.getElementById('modal-pause').classList.add('hidden');if(typeof continuarBatalha==='function')continuarBatalha()};document.getElementById('btn-musica').onclick=e=>{
@@ -3085,7 +3104,7 @@ function iniciarIntroDeLuta(boss){const overlay=document.getElementById('tela-fi
   e.currentTarget.textContent=batalhaMusicaLigada?'🔊 Música: ligada':'🔇 Música: desligada';
   if(window.setBattleMusicEnabled)window.setBattleMusicEnabled(batalhaMusicaLigada,bossSelecionadoId);
   save();
-};document.getElementById('btn-sair').onclick=()=>{document.getElementById('modal-pause').classList.add('hidden');document.getElementById('modal-confirmar-saida').classList.remove('hidden')};document.getElementById('btn-cancelar-sair').onclick=()=>{document.getElementById('modal-confirmar-saida').classList.add('hidden');document.getElementById('modal-pause').classList.remove('hidden')};document.getElementById('btn-confirmar-sair').onclick=async()=>{document.getElementById('modal-confirmar-saida').classList.add('hidden');try{const battleId=window.arcaneBattleId;if(battleId&&window.supabaseClient){const{error}=await window.supabaseClient.rpc('encerrar_batalha',{p_battle_id:battleId});if(error)throw error;}}catch(e){console.error('Erro ao encerrar batalha no servidor:',e);}finally{window.arcaneBattleId=null;if(typeof pararBatalha==='function')pararBatalha();if(window.stopBossMusic)stopBossMusic();show('tela-menu')}};
+};document.getElementById('btn-sair').onclick=()=>{document.getElementById('modal-pause').classList.add('hidden');document.getElementById('modal-confirmar-saida').classList.remove('hidden')};document.getElementById('btn-cancelar-sair').onclick=()=>{document.getElementById('modal-confirmar-saida').classList.add('hidden');document.getElementById('modal-pause').classList.remove('hidden')};document.getElementById('btn-confirmar-sair').onclick=async()=>{document.getElementById('modal-confirmar-saida').classList.add('hidden');try{const battleId=window.arcaneBattleId;if(battleId&&window.supabaseClient){const{error}=await window.supabaseClient.rpc('encerrar_batalha',{p_battle_id:battleId});if(error)throw error;}}catch(e){console.error('Erro ao encerrar batalha no servidor:',e);}finally{window.arcaneBattleId=null;if(typeof pararBatalha==='function')pararBatalha();if(window.stopBossMusic)stopBossMusic();show('tela-bosses')}};
 window.addEventListener('error', (event) => {
   console.error('Arcane Clash runtime error:', event.error || event.message);
 });

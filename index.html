@@ -118,7 +118,12 @@
      <div class="side-title">
       NAVEGAR
      </div>
-     <button class="nav-card" data-badge-target="loja" data-tela="tela-loja">
+     <!-- ETAPA 14 (World-First): atalhos diretos pra Loja/Cenários/Melhorias/
+          Inventário removidos da navegação principal — os sistemas continuam
+          100% funcionais e são acessados de dentro do mundo (ex: Loja pela
+          Loja física do Universo 1). Nada foi apagado, só escondido
+          (style="display:none") pra permitir reativar facilmente no futuro. -->
+     <button class="nav-card" data-badge-target="loja" data-tela="tela-loja" style="display:none">
       <span>
        🛒
       </span>
@@ -129,7 +134,7 @@
        Skills e melhorias
       </small>
      </button>
-     <button class="nav-card" data-badge-target="temas" data-tela="tela-temas">
+     <button class="nav-card" data-badge-target="temas" data-tela="tela-temas" style="display:none">
       <span>
        🌌
       </span>
@@ -140,7 +145,7 @@
        Escolha sua arena
       </small>
      </button>
-     <button class="nav-card" data-badge-target="melhorias" data-tela="tela-melhorias">
+     <button class="nav-card" data-badge-target="melhorias" data-tela="tela-melhorias" style="display:none">
       <span>
        ❤️‍🔥
       </span>
@@ -151,7 +156,7 @@
        Evolua sua vida
       </small>
      </button>
-     <button class="nav-card" data-badge-target="inventario" data-tela="tela-inventario">
+     <button class="nav-card" data-badge-target="inventario" data-tela="tela-inventario" style="display:none">
       <span>
        🎒
       </span>
@@ -184,7 +189,7 @@
        Mapa e progresso
       </small>
      </button>
-     <button class="nav-card" data-badge-target="bosses" data-tela="tela-bosses">
+     <button class="nav-card" data-badge-target="bosses" data-tela="tela-bosses" style="display:none">
       <span>
        ☠
       </span>
@@ -222,7 +227,11 @@
       </p>
      </div>
      <div class="center-grid">
-      <button class="feature-card feature-banner" data-badge-target="banner" data-tela="tela-banner">
+      <!-- ETAPA 14 (World-First): atalhos de Banner/Giro Diário/Personagens/
+           Missões escondidos da navegação principal (sistemas preservados
+           para migração futura pro mundo — item 4 da Etapa 14). Missões já
+           são acessadas via diálogo de NPC dentro da exploração. -->
+      <button class="feature-card feature-banner" data-badge-target="banner" data-tela="tela-banner" style="display:none">
        <span class="feature-icon">
         🎴
        </span>
@@ -233,7 +242,7 @@
         Invocar personagens
        </small>
       </button>
-      <button class="feature-card daily-wheel-feature-card" data-tela="tela-giro-diario">
+      <button class="feature-card daily-wheel-feature-card" data-tela="tela-giro-diario" style="display:none">
        <span class="feature-icon">🎡</span>
        <b>Giro Diário</b>
        <small>1 giro grátis a cada 24h</small>
@@ -249,7 +258,7 @@
         Vantagens premium
        </small>
       </button>
-      <button class="feature-card" data-badge-target="personagens" data-tela="tela-personagens">
+      <button class="feature-card" data-badge-target="personagens" data-tela="tela-personagens" style="display:none">
        <span class="feature-icon">
         ♟
        </span>
@@ -260,7 +269,7 @@
         Equipar e fundir
        </small>
       </button>
-      <button class="feature-card" data-badge-target="missoes" data-tela="tela-missoes">
+      <button class="feature-card" data-badge-target="missoes" data-tela="tela-missoes" style="display:none">
        <span class="feature-icon">
         ☑
        </span>
@@ -518,7 +527,7 @@
    </div>
   </section>
   <section class="screen panel-screen" id="tela-bosses">
-   <button class="back-btn" data-voltar="tela-menu">
+   <button class="back-btn" data-voltar="tela-exploracao">
     ←
    </button>
    <div class="panel-head">
@@ -536,7 +545,7 @@
    </div>
   </section>
   <section class="screen panel-screen" id="tela-loja">
-   <button class="back-btn" data-voltar="tela-menu">
+   <button class="back-btn" data-voltar="tela-exploracao">
     ←
    </button>
    <div class="panel-head">
@@ -593,7 +602,7 @@
    </div>
   </section>
   <section class="screen panel-screen" id="tela-boss-info">
-   <button class="back-btn" data-voltar="tela-menu">
+   <button class="back-btn" data-voltar="tela-bosses">
     ←
    </button>
    <div class="panel-head">
@@ -732,7 +741,7 @@
    </div>
   </div>
   <div class="screen battle-screen" id="tela-exploracao">
-   <button class="pause-btn" data-voltar="tela-menu" id="btn-sair-exploracao">
+   <button class="pause-btn" data-voltar="tela-universos" id="btn-sair-exploracao">
     ✕
    </button>
    <div class="battle-message hidden" id="prompt-interacao-exploracao">

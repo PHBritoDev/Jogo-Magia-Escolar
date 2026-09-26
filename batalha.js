@@ -142,7 +142,17 @@ function prepararCamadaSprites() {
   camada.style.transformOrigin = "0 0";
   camada.style.willChange = "transform";
 }
-prepararCamadaSprites();
+// ETAPA 14: a chamada de prepararCamadaSprites() ficava AQUI (logo após a
+// declaração da função), mas o corpo da função usa WORLD_W/WORLD_H, que só são
+// declarados mais abaixo (const WORLD_W/WORLD_H, perto de elementosBatalha).
+// Chamar a função antes disso lançava "Cannot access 'WORLD_W' before
+// initialization" — e como isso interrompia a execução do script no meio,
+// TUDO que vinha depois (elementosBatalha, jogoAtivo, as demais funções de
+// batalha) nunca chegava a ser inicializado, o que também explicava os erros
+// "Cannot access 'elementosBatalha'/'jogoAtivo' before initialization"
+// relatados junto. A chamada foi movida pra depois da declaração de
+// elementosBatalha (mesmo lugar de setup), sem mexer em nenhum valor de
+// jogo/física — só na ORDEM de inicialização.
 
 
 
@@ -323,6 +333,7 @@ const elementosBatalha = {
   cooldownSkill1: document.getElementById("cooldown-skill1"),
   cooldownSkill2: document.getElementById("cooldown-skill2")
 };
+prepararCamadaSprites();
 
 // camX/camY agora carregam o deslocamento de PARALLAX do fundo (não mais "câmera
 // bruta" — a câmera de verdade é camCenterX/camCenterY/camZoomAtual logo abaixo).
