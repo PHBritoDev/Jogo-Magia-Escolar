@@ -1197,3 +1197,293 @@ html { font-size: clamp(13px, 1.1vw + 8px, 18px); }
   0%, 100% { opacity: .5; }
   50% { opacity: 1; }
 }
+
+/* =============================================================================
+   ETAPA 15 — GALÁXIA DE UNIVERSOS
+   -----------------------------------------------------------------------------
+   Antes, #grid-universos usava a classe genérica ".boss-grid" (grade de
+   cards quadrados) e universos.js gerava cards ".boss-card.universo-card"
+   com texto pequeno e cinza sobre fundo já escuro — por isso a tela parecia
+   "só fundo escuro com partículas" (auditoria da Etapa 15). Agora o próprio
+   index.html usa a classe ".galaxy-map" nesse container, então NENHUMA regra
+   de ".boss-grid"/".boss-card" (grid quadrado) se aplica mais aqui: tudo
+   abaixo é dedicado só à galáxia.
+   Leve para celular: sem canvas, sem partículas animadas por JS — só CSS
+   (gradientes estáticos + poucas animações simples de opacidade/escala).
+   ============================================================================= */
+.galaxy-map {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  aspect-ratio: 3 / 4;
+  max-height: 72vh;
+  border-radius: 22px;
+  overflow: hidden;
+  border: 1px solid rgba(123, 92, 255, .28);
+  box-shadow: 0 14px 50px rgba(0,0,0,.45), 0 0 60px rgba(90,60,255,.12) inset;
+  touch-action: pan-y;
+}
+
+.galaxy-fundo {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(90,60,255,.35), transparent 38%),
+    radial-gradient(circle at 82% 20%, rgba(255,70,190,.22), transparent 40%),
+    radial-gradient(circle at 50% 85%, rgba(60,200,255,.18), transparent 45%),
+    radial-gradient(circle at 12% 12%, rgba(255,255,255,.9) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 34% 62%, rgba(255,255,255,.8) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 68% 34%, rgba(255,255,255,.85) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 78% 78%, rgba(255,255,255,.75) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 55% 8%, rgba(255,255,255,.7) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 22% 90%, rgba(255,255,255,.7) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 92% 55%, rgba(255,255,255,.7) 0 1px, transparent 1.6px),
+    linear-gradient(160deg, #05061a 0%, #0c0d2e 45%, #170b2e 100%);
+  background-size: cover, cover, cover, 130px 130px, 150px 150px, 110px 110px, 170px 170px, 140px 140px, 160px 160px, 120px 120px, cover;
+  animation: galaxyTwinkle 5s ease-in-out infinite;
+}
+@keyframes galaxyTwinkle {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.12); }
+}
+
+.galaxy-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.galaxy-linha {
+  stroke: rgba(140, 150, 200, .28);
+  stroke-width: .6;
+  stroke-dasharray: 2 2;
+}
+.galaxy-linha.ativa {
+  stroke: rgba(150, 210, 255, .75);
+  stroke-dasharray: none;
+}
+
+.galaxy-nos {
+  position: absolute;
+  inset: 0;
+}
+
+.universo-node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.universo-node-anel {
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 2px solid var(--universo-cor, #7b5cff);
+  opacity: .55;
+  animation: universoAnelPulso 2.6s ease-in-out infinite;
+}
+@keyframes universoAnelPulso {
+  0%, 100% { transform: scale(1); opacity: .5; }
+  50% { transform: scale(1.16); opacity: .1; }
+}
+
+.universo-node-corpo {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 35% 30%, var(--universo-cor, #7b5cff), rgba(10,10,25,.9) 78%);
+  box-shadow: 0 0 16px 2px color-mix(in srgb, var(--universo-cor, #7b5cff) 55%, transparent);
+  border: 2px solid rgba(255,255,255,.18);
+}
+.universo-node-corpo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.universo-node-fallback {
+  font-size: 1.3rem;
+}
+
+.universo-node-selo {
+  position: absolute;
+  top: -4px;
+  right: -2px;
+  font-size: .62rem;
+  background: rgba(8,10,22,.9);
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255,255,255,.25);
+}
+
+.universo-node-label {
+  font-size: .56rem;
+  font-weight: 800;
+  letter-spacing: .02em;
+  color: #dfe4ff;
+  text-align: center;
+  line-height: 1.15;
+  text-shadow: 0 1px 4px rgba(0,0,0,.9);
+  max-width: 70px;
+}
+
+.universo-node.locked .universo-node-corpo {
+  filter: grayscale(.75) brightness(.55);
+}
+.universo-node.locked .universo-node-anel { opacity: .18; animation: none; }
+.universo-node.locked .universo-node-label { color: #8b90ab; }
+
+.universo-node.concluido .universo-node-corpo {
+  box-shadow: 0 0 18px 3px color-mix(in srgb, var(--universo-cor, #5cff9c) 70%, transparent);
+}
+
+.universo-node.atual .universo-node-corpo {
+  border-color: #fff;
+}
+.universo-node.atual::after {
+  content: "VOCÊ ESTÁ AQUI";
+  position: absolute;
+  bottom: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: .48rem;
+  font-weight: 900;
+  letter-spacing: .05em;
+  color: #c9bfff;
+  background: rgba(123,92,255,.25);
+  padding: 2px 5px;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+
+@media (max-width: 420px) {
+  .universo-node-corpo { width: 44px; height: 44px; }
+  .universo-node-label { font-size: .5rem; max-width: 58px; }
+}
+
+/* --- Preview de universo (confirmação antes de entrar) --- */
+.universo-preview-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(4,5,14,.78);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 900;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s ease;
+}
+.universo-preview-overlay.ativo {
+  opacity: 1;
+  pointer-events: auto;
+}
+.universo-preview-card {
+  width: 100%;
+  max-width: 420px;
+  background: linear-gradient(180deg, rgba(20,20,40,.98), rgba(8,8,20,.98));
+  border: 1px solid color-mix(in srgb, var(--universo-cor, #7b5cff) 50%, rgba(255,255,255,.15));
+  border-radius: 20px 20px 0 0;
+  padding: 18px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -10px 40px rgba(0,0,0,.5);
+  transform: translateY(12px);
+  transition: transform .22s ease;
+  position: relative;
+}
+.universo-preview-overlay.ativo .universo-preview-card {
+  transform: translateY(0);
+}
+.universo-preview-fechar {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: rgba(255,255,255,.08);
+  border: none;
+  color: #fff;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: .9rem;
+  cursor: pointer;
+}
+.universo-preview-topo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.universo-preview-boss-img {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--universo-cor, #7b5cff);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--universo-cor, #7b5cff) 60%, transparent);
+}
+.universo-preview-numero {
+  font-size: .62rem;
+  font-weight: 900;
+  letter-spacing: .1em;
+  color: #8ea2ff;
+}
+.universo-preview-titulo {
+  margin: 2px 0 0;
+  font-size: 1.05rem;
+  color: #fff;
+}
+.universo-preview-desc {
+  font-size: .82rem;
+  color: #b8bfd9;
+  line-height: 1.4;
+  margin: 0 0 10px;
+}
+.universo-preview-boss-linha {
+  font-size: .78rem;
+  color: #cfd4ea;
+  margin-bottom: 14px;
+}
+.universo-preview-entrar {
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  font-weight: 900;
+  letter-spacing: .04em;
+  cursor: pointer;
+  background: linear-gradient(135deg, var(--universo-cor, #7b5cff), #42efff);
+  color: #0a0d1c;
+}
+
+/* --- Transição leve Galáxia → Universo → Exploração --- */
+.universo-transicao-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+  background: radial-gradient(circle at 50% 50%, rgba(150,120,255,.9), #05061a 72%);
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(1.3);
+  transition: opacity .22s ease, transform .42s ease;
+}
+.universo-transicao-overlay.ativa {
+  opacity: 1;
+  transform: scale(1);
+}

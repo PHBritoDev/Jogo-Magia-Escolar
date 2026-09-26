@@ -2888,10 +2888,10 @@ async function sincronizarEstadoDoServidor() {
       .from('Player')
       .select(`
         coins,
-        diamante,
+        diamonds,
         bosses_derrotados,
         boss_kills,
-        mission_proguess,
+        mission_progress,
         claimed_missions,
         inventory,
         equipped,
@@ -2918,14 +2918,14 @@ async function sincronizarEstadoDoServidor() {
     if (error) throw error;
 
     moedasGlobais = Number(data.coins || 0);
-    diamantesGlobais = Number(data.diamante || 0);
+    diamantesGlobais = Number(data.diamonds || 0);
 
     bossesDerrotados = Array.isArray(data.bosses_derrotados)
       ? data.bosses_derrotados.map(Number)
       : [];
 
     bossKills = data.boss_kills || {};
-    missionProgress = data.mission_proguess || { boss1: 0 };
+    missionProgress = data.mission_progress || { boss1: 0 };
     claimed = data.claimed_missions || {};
     fused = data.fused || {};
     fusionBonuses = data.fusion_bonuses || {};
