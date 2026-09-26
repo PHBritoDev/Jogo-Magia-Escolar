@@ -162,6 +162,28 @@
        Seus equipamentos
       </small>
      </button>
+     <button class="nav-card" data-tela="tela-exploracao" id="nav-exploracao">
+      <span>
+       🌍
+      </span>
+      <b>
+       Explorar
+      </b>
+      <small>
+       Área de teste
+      </small>
+     </button>
+     <button class="nav-card" data-tela="tela-universos" id="nav-universos">
+      <span>
+       🌌
+      </span>
+      <b>
+       Universos
+      </b>
+      <small>
+       Mapa e progresso
+      </small>
+     </button>
      <button class="nav-card" data-badge-target="bosses" data-tela="tela-bosses">
       <span>
        ☠
@@ -478,6 +500,23 @@
    <div class="missions-list" id="missoes-conteudo">
    </div>
   </section>
+  <section class="screen panel-screen" id="tela-universos">
+   <button class="back-btn" data-voltar="tela-menu">
+    ←
+   </button>
+   <div class="panel-head">
+    <div>
+     <small>
+      HUB CÓSMICO
+     </small>
+     <h2>
+      UNIVERSOS
+     </h2>
+    </div>
+   </div>
+   <div class="boss-grid" id="grid-universos">
+   </div>
+  </section>
   <section class="screen panel-screen" id="tela-bosses">
    <button class="back-btn" data-voltar="tela-menu">
     ←
@@ -648,7 +687,7 @@
    </div>
    <div id="viewport-jogo">
     <div id="area-jogo">
-     <canvas height="700" id="jogo" width="1100">
+     <canvas height="1400" id="jogo" width="2400">
      </canvas>
      <div id="camada-sprites">
      </div>
@@ -692,6 +731,52 @@
     </div>
    </div>
   </div>
+  <div class="screen battle-screen" id="tela-exploracao">
+   <button class="pause-btn" data-voltar="tela-menu" id="btn-sair-exploracao">
+    ✕
+   </button>
+   <div class="battle-message hidden" id="prompt-interacao-exploracao">
+    Pressione <b>E</b>
+   </div>
+   <div id="viewport-exploracao">
+    <div id="area-exploracao">
+     <canvas height="1600" id="mundo-exploracao-fundo" width="3000">
+     </canvas>
+     <div id="camada-midground-exploracao">
+     </div>
+     <div id="camada-mundo-exploracao">
+     </div>
+     <div id="camada-foreground-exploracao">
+     </div>
+    </div>
+    <canvas id="clima-exploracao">
+    </canvas>
+   </div>
+   <div class="hidden" id="hud-missao-exploracao">
+    <p class="hud-missao-titulo">MISSÃO</p>
+    <p class="hud-missao-nome">
+    </p>
+    <div class="mission-progress">
+     <i class="hud-missao-barra" style="width:0%">
+     </i>
+    </div>
+    <small class="hud-missao-progresso">
+    </small>
+   </div>
+   <div class="battle-controls">
+    <div class="dpad dpad-joystick">
+     <div class="boss-joystick-base" id="exploracao-joystick-base">
+      <div class="boss-joystick-knob" id="exploracao-joystick-knob">
+      </div>
+     </div>
+    </div>
+    <button class="skill-button" id="btn-interagir-exploracao" style="display:none">
+     <b>
+      INTERAGIR
+     </b>
+    </button>
+   </div>
+  </div>
   <div class="overlay hidden" id="modal-pause">
    <div class="modal-box">
     <h2>
@@ -705,6 +790,31 @@
     </button>
     <button class="modal-action danger" id="btn-sair">
      SAIR DA LUTA
+    </button>
+   </div>
+  </div>
+  <div class="overlay hidden" id="modal-npc-dialogo">
+   <div class="modal-box">
+    <h2 class="npc-dialogo-nome" id="npc-dialogo-nome">
+     NPC
+    </h2>
+    <p class="npc-dialogo-texto" id="npc-dialogo-texto">
+    </p>
+    <div class="npc-dialogo-missao hidden" id="npc-dialogo-missao">
+     <h4 id="npc-dialogo-missao-titulo">
+     </h4>
+     <div class="mission-progress">
+      <i id="npc-dialogo-missao-barra" style="width:0%">
+      </i>
+     </div>
+     <small id="npc-dialogo-missao-progresso">
+     </small>
+    </div>
+    <button class="modal-action hidden" id="btn-npc-dialogo-resgatar" type="button">
+     RESGATAR
+    </button>
+    <button class="modal-action" id="btn-npc-dialogo-fechar" type="button">
+     FECHAR
     </button>
    </div>
   </div>
@@ -742,7 +852,15 @@
   </script>
   <script src="menu.js?v=3">
   </script>
+  <script src="fisicaBatalha.js?v=1">
+  </script>
+  <script src="ambienteBatalha.js?v=1">
+  </script>
   <script src="batalha.js?v=2">
+  </script>
+  <script src="exploracao.js?v=1">
+  </script>
+  <script src="universos.js?v=1">
   </script>
   <script>
     (function(){

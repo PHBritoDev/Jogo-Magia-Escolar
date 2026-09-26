@@ -136,8 +136,8 @@ function prepararCamadaSprites() {
   camada.style.position = "absolute";
   camada.style.left = "0";
   camada.style.top = "0";
-  camada.style.width = "1100px";
-  camada.style.height = "700px";
+  camada.style.width = WORLD_W + "px";
+  camada.style.height = WORLD_H + "px";
   camada.style.pointerEvents = "none";
   camada.style.transformOrigin = "0 0";
   camada.style.willChange = "transform";
@@ -185,15 +185,52 @@ function posicionarSprite(id, src, xTela, yTela, largura, altura, classeExtra, v
     el.dataset.tamanho = tamanho;
   }
 
-  const espelho = virarEsquerda ? " scaleX(-1)" : "";
+  // Física 2.5D (Etapa 1): só personagem/inimigo/guilherme têm "corpo" físico
+  // (salto/queda/squash) — poderes e feixes continuam exatamente como antes.
+  const fisica = window.FisicaBatalha && window.FisicaBatalha.corpos[id] ? window.FisicaBatalha.offsetVisual(id) : null;
+  const dyFisica = fisica ? fisica.dy : 0;
+  const espelhoSinal = virarEsquerda ? -1 : 1;
+  const escalaX = (fisica ? fisica.scaleX : 1) * espelhoSinal;
+  const escalaY = fisica ? fisica.scaleY : 1;
+  const semEscala = escalaX === espelhoSinal && escalaY === 1;
   const transform =
-    "translate(" + (xTela - largura / 2) + "px," + (yTela - altura / 2) + "px)" + espelho;
+    "translate(" + (xTela - largura / 2) + "px," + (yTela - altura / 2 + dyFisica) + "px)" +
+    (semEscala ? (virarEsquerda ? " scaleX(-1)" : "") : " scale(" + escalaX + "," + escalaY + ")");
   if (el.dataset.transform !== transform) {
     el.style.transform = transform;
     el.dataset.transform = transform;
   }
 
   return el;
+}
+
+function posicionarSombraChao(id, xTela, yTela, tamanho) {
+  let el = elementosSprites[id];
+  if (!el) {
+    el = document.createElement("div");
+    el.className = "sombra-chao";
+    const camada = document.getElementById("camada-sprites");
+    camada.insertBefore(el, camada.firstChild);
+    elementosSprites[id] = el;
+  }
+  const idCorpo = id.replace("sombra-", "");
+  const fisica = window.FisicaBatalha ? window.FisicaBatalha.offsetVisual(idCorpo) : null;
+  const escalaSombra = fisica ? fisica.sombraEscala : 1;
+  const largura = tamanho * 0.62, alturaSombra = tamanho * 0.2;
+  el.style.width = largura + "px";
+  el.style.height = alturaSombra + "px";
+  el.style.opacity = fisica ? fisica.sombraOpacidade : 0.5;
+  el.style.transform =
+    "translate(" + (xTela - largura / 2) + "px," + (yTela - alturaSombra / 2) + "px) scale(" + escalaSombra + ")";
+}
+
+function aplicarKnockback(alvo, origemX, origemY, forca) {
+  const dx = (alvo === "player" ? x : inimigoX) - origemX;
+  const dy = (alvo === "player" ? y : inimigoY) - origemY;
+  const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+  const nx = dx / dist, ny = dy / dist;
+  if (alvo === "player") { velX += nx * forca; velY += ny * forca; }
+  else { inimigoVelX += nx * forca; inimigoVelY += ny * forca; }
 }
 
 function posicionarSpriteFeixe(id, src, origemXTela, origemYTela, comprimentoMax, largura, anguloRad, progresso) {
@@ -261,6 +298,17 @@ let proximoIdPoder = 1;
 
 const canvasBatalha = document.getElementById("jogo");
 const ctxBatalha = canvasBatalha.getContext("2d");
+
+// ===== ETAPA 2: ARENA 2.5D REAL + CÂMERA DINÂMICA =====
+// O "mundo" da batalha agora é maior que a tela (antes: mundo == viewport, câmera
+// só dava um "fit" pra mostrar tudo de uma vez). WORLD_W/WORLD_H são as dimensões
+// reais da arena em coordenadas de mundo; #viewport-jogo continua sendo a "janela"
+// (tamanho da tela) e #area-jogo/#jogo/#camada-sprites passam a ter o tamanho do
+// mundo (ver CSS), com uma câmera real (posição + zoom) fazendo o recorte.
+const WORLD_W = 2400;
+const WORLD_H = 1400;
+canvasBatalha.width = WORLD_W;
+canvasBatalha.height = WORLD_H;
 const elementosBatalha = {
   viewport: document.getElementById("viewport-jogo"),
   area: document.getElementById("area-jogo"),
@@ -276,21 +324,31 @@ const elementosBatalha = {
   cooldownSkill2: document.getElementById("cooldown-skill2")
 };
 
+// camX/camY agora carregam o deslocamento de PARALLAX do fundo (não mais "câmera
+// bruta" — a câmera de verdade é camCenterX/camCenterY/camZoomAtual logo abaixo).
 let camX = 0, camY = 0;
 let limitesMundo = null;
 
 let fundoLarguraEscalada = 0;
 let fundoAlturaEscalada = 0;
+let fundoMargemParallaxX = 0;
+let fundoMargemParallaxY = 0;
 
 const TAMANHO_PERSONAGEM = 175;
 const TAMANHO_BOSS = 175;
 
-const MARGEM_MUNDO = 110;
+const MARGEM_MUNDO = 160;
+
+// O fundo é renderizado um pouco maior que o mundo (INFLACAO_FUNDO) pra sobrar
+// "folga" nas bordas — essa folga é usada pra mover o fundo mais devagar que a
+// câmera (parallax), sem nunca revelar bordas vazias da imagem.
+const INFLACAO_FUNDO = 1.28;
+const PARALLAX_FUNDO = 0.35;
 
 function calcularLimitesMundo() {
-  
-  const larguraMundo = canvasBatalha.width;
-  const alturaMundo = canvasBatalha.height;
+
+  const larguraMundo = WORLD_W * INFLACAO_FUNDO;
+  const alturaMundo = WORLD_H * INFLACAO_FUNDO;
 
   if (!fundoImg || !fundoImg.naturalWidth) {
     fundoLarguraEscalada = larguraMundo;
@@ -303,12 +361,14 @@ function calcularLimitesMundo() {
     fundoLarguraEscalada = fundoImg.naturalWidth * escalaCobertura;
     fundoAlturaEscalada = fundoImg.naturalHeight * escalaCobertura;
   }
+  fundoMargemParallaxX = Math.max(0, (fundoLarguraEscalada - WORLD_W) / 2);
+  fundoMargemParallaxY = Math.max(0, (fundoAlturaEscalada - WORLD_H) / 2);
 
   limitesMundo = {
     minX: MARGEM_MUNDO,
     minY: MARGEM_MUNDO,
-    maxX: Math.max(MARGEM_MUNDO, larguraMundo - MARGEM_MUNDO),
-    maxY: Math.max(MARGEM_MUNDO, alturaMundo - MARGEM_MUNDO)
+    maxX: Math.max(MARGEM_MUNDO, WORLD_W - MARGEM_MUNDO),
+    maxY: Math.max(MARGEM_MUNDO, WORLD_H - MARGEM_MUNDO)
   };
 
   x = clamp(x, limitesMundo.minX, limitesMundo.maxX);
@@ -331,6 +391,7 @@ let movendoDireita = false, movendoEsquerda = false, movendoCima = false, movend
   const ZONA_MORTA = 8;
   let arrastando = false;
   let pointerId = null;
+  let moveuBastante = false;
 
   function mover(clientX, clientY) {
     const rect = base.getBoundingClientRect();
@@ -340,6 +401,7 @@ let movendoDireita = false, movendoEsquerda = false, movendoCima = false, movend
     let dy = clientY - centroY;
     const dist = Math.hypot(dx, dy);
     if (dist > RAIO) { dx = (dx / dist) * RAIO; dy = (dy / dist) * RAIO; }
+    if (dist > ZONA_MORTA) moveuBastante = true;
     knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
 
     movendoDireita = dx > ZONA_MORTA;
@@ -355,12 +417,21 @@ let movendoDireita = false, movendoEsquerda = false, movendoCima = false, movend
     knob.classList.remove("arrastando");
     knob.style.transform = "translate(-50%, -50%)";
     movendoDireita = movendoEsquerda = movendoCima = movendoBaixo = false;
+    // Toque curto e sem arrastar = pular (física 2.5D, Etapa 1).
+    if (!moveuBastante && Date.now() - ultimoToqueEm < 220 && window.FisicaBatalha) {
+      window.FisicaBatalha.pular("personagem");
+    }
+    moveuBastante = false;
   }
 
+  // Toque rápido (tap) no joystick, sem arrastar = pular. Não interfere no
+  // arrastar normal, que continua controlando o movimento como sempre.
+  let ultimoToqueEm = 0;
   base.addEventListener("pointerdown", function (evento) {
     evento.preventDefault();
     arrastando = true;
     pointerId = evento.pointerId;
+    ultimoToqueEm = Date.now();
     knob.classList.add("arrastando");
     try { base.setPointerCapture(pointerId); } catch (_) {}
     mover(evento.clientX, evento.clientY);
@@ -381,6 +452,7 @@ window.addEventListener("keydown", function (evento) {
   if (evento.key === "ArrowLeft" || tecla === "a") movendoEsquerda = true;
   if (evento.key === "ArrowUp" || tecla === "w") movendoCima = true;
   if (evento.key === "ArrowDown" || tecla === "s") movendoBaixo = true;
+  if (evento.key === " " || evento.code === "Space") { if (window.FisicaBatalha) window.FisicaBatalha.pular("personagem"); }
 });
 window.addEventListener("keyup", function (evento) {
   const tecla = evento.key.toLowerCase();
@@ -532,6 +604,13 @@ window.registrarDanoServidor = registrarDanoServidor;
 
 function iniciarBatalha(boss, jogador, inventario, corAura) {
   finalizandoBatalha = false;
+  if (window.FisicaBatalha) {
+    // Reseta o estado físico (salto/squash) entre batalhas, sem tocar em vida/dano/etc.
+    Object.keys(window.FisicaBatalha.corpos).forEach(function (id) {
+      const c = window.FisicaBatalha.corpos[id];
+      c.altura = 0; c.velAltura = 0; c.noChao = true; c.squash = 1;
+    });
+  }
   bossAtual = boss;
   jogadorAtual = jogador;
   if(window.playBossMusic)playBossMusic(boss.id);
@@ -551,6 +630,11 @@ function iniciarBatalha(boss, jogador, inventario, corAura) {
   
   fundoImg.src = "Boss" + boss.id + "Img.png";
 
+  // Ambiente visual por boss (item 11) — puramente estético (tingimento do
+  // chão + partículas leves). Não mexe em dano/vida/física/colisão; se o
+  // módulo não carregar por algum motivo, a batalha continua igual a antes.
+  if (window.AmbienteBatalha) window.AmbienteBatalha.iniciar(boss.id, WORLD_W, WORLD_H);
+
   document.getElementById("nome-player-hud").textContent = jogador.nome;
   document.getElementById("nome-boss-hud").textContent = boss.nome;
   document.getElementById("nome-boss-hud").style.color = corAura;
@@ -559,14 +643,18 @@ function iniciarBatalha(boss, jogador, inventario, corAura) {
   if(s1Icon) s1Icon.src=(inventario.equipados&&inventario.equipados.skill1?inventario.equipados.skill1:"RelampagoSkill1")+".gif";
   if(s2Icon) s2Icon.src=(inventario.equipados&&inventario.equipados.skill2?inventario.equipados.skill2:"RaioSkill2")+".gif";
 
-  x = 550; y = 350;
-  inimigoX = 800; inimigoY = 350;
+  x = WORLD_W * 0.40; y = WORLD_H * 0.55;
+  inimigoX = WORLD_W * 0.60; inimigoY = WORLD_H * 0.55;
   velX = 0; velY = 0;
   inimigoVelX = 0; inimigoVelY = 0;
   anguloOrbitaInimigo = Math.random() * Math.PI * 2;
   camX = 0; camY = 0;
   limitesMundo = null;
   fundoLarguraEscalada = 0; fundoAlturaEscalada = 0;
+  // Câmera começa já centrada nos dois lutadores (evita um "salto" visível no 1º frame).
+  camCenterX = (x + inimigoX) / 2;
+  camCenterY = (y + inimigoY) / 2;
+  camZoomAtual = 0; // 0 = "ainda não calculado"; primeiro frame assume o valor-alvo direto
 
   const bonusVida = (typeof calcularBonusVidaPermanente === "function") ? calcularBonusVidaPermanente() : 0;
   vidaMax = 800 + bonusVida; vidaPlay = vidaMax;
@@ -658,13 +746,19 @@ function atualizarBarrasBatalha() {
 function desenharBatalha() {
   ctxBatalha.clearRect(0, 0, canvasBatalha.width, canvasBatalha.height);
 
+  // Fundo desenhado maior que o mundo e deslocado por camX/camY (calculado em
+  // atualizarCameraBatalha, proporcional ao movimento da câmera × PARALLAX_FUNDO):
+  // ele acompanha a câmera, mas mais devagar — sensação de profundidade (item 6),
+  // sem nunca revelar borda (o deslocamento é sempre limitado pela margem inflada).
+  const drawX = -fundoMargemParallaxX - camX;
+  const drawY = -fundoMargemParallaxY - camY;
   if (fundoImg && fundoImg.complete && fundoImg.naturalWidth > 0) {
     if (fundoCanvasChroma) {
-      ctxBatalha.drawImage(fundoCanvasChroma, -camX, -camY, fundoCanvasChroma.width, fundoCanvasChroma.height);
+      ctxBatalha.drawImage(fundoCanvasChroma, drawX, drawY, fundoCanvasChroma.width, fundoCanvasChroma.height);
     } else {
       const largura = fundoLarguraEscalada || fundoImg.naturalWidth;
       const altura = fundoAlturaEscalada || fundoImg.naturalHeight;
-      ctxBatalha.drawImage(fundoImg, -camX, -camY, largura, altura);
+      ctxBatalha.drawImage(fundoImg, drawX, drawY, largura, altura);
     }
   } else {
     const gradiente = ctxBatalha.createRadialGradient(
@@ -682,6 +776,20 @@ function desenharBatalha() {
     ctxBatalha.fillRect(0, 0, canvasBatalha.width, canvasBatalha.height);
   }
 
+  // Chão visual (item 8): faixa inferior sutil, escurecendo em direção à base do
+  // mundo, pra reforçar a sensação de piso em vez de uma linha artificial — não
+  // usa nenhum asset novo, só um gradiente por cima do fundo já existente.
+  const chaoY = WORLD_H * 0.62;
+  const gradienteChao = ctxBatalha.createLinearGradient(0, chaoY, 0, WORLD_H);
+  gradienteChao.addColorStop(0, "rgba(0,0,0,0)");
+  gradienteChao.addColorStop(1, "rgba(0,0,0,0.30)");
+  ctxBatalha.fillStyle = gradienteChao;
+  ctxBatalha.fillRect(0, chaoY, WORLD_W, WORLD_H - chaoY);
+
+  // Ambiente visual por boss (item 11/12) — tingimento do chão + partículas
+  // leves, desenhado por cima do chão de sempre. Só afeta aparência.
+  if (window.AmbienteBatalha) window.AmbienteBatalha.desenhar(ctxBatalha, WORLD_W, WORLD_H);
+
   const idsUsados = new Set(["personagem", "inimigo"]);
   let personagemEquipado = inventarioAtual.equipados && inventarioAtual.equipados.imagem;
   // Mesma guarda de menu.js: id equipado pela loja do PvP (sufixo "Pvp") não tem arquivo
@@ -693,6 +801,9 @@ function desenharBatalha() {
   const spritePersonagem = personagemEquipado
     ? (personagemEquipado === "PaulaoDoPneuBanner" ? "PaulaoDoPneuBanner.jpg" : personagemEquipado === "CarlosBanner" ? "CarlosBanner.webp" : (PETS_VIDEO[personagemEquipado] || personagemEquipado + ".webp"))
     : "ArlanBanner.webp";
+
+  posicionarSombraChao("sombra-personagem", x, y + TAMANHO_PERSONAGEM * 0.42, TAMANHO_PERSONAGEM);
+  idsUsados.add("sombra-personagem");
 
   const spritePlayer = posicionarSprite(
     "personagem",
@@ -731,6 +842,8 @@ function desenharBatalha() {
   // só o width/height passado pro posicionarSprite — fallback pro tamanho padrão se faltar.
   const bossTamanhos = { 1:150, 2:158, 3:165, 4:172, 5:180, 6:190, 7:200, 8:350, 9:235, 10:260 };
   const tamanhoBossAtual = bossTamanhos[Number(bossAtual?.id)] || TAMANHO_BOSS;
+  posicionarSombraChao("sombra-inimigo", inimigoX, inimigoY + tamanhoBossAtual * 0.42, tamanhoBossAtual);
+  idsUsados.add("sombra-inimigo");
   const bossSprite = posicionarSprite("inimigo", imagemBoss, inimigoX, inimigoY, tamanhoBossAtual, tamanhoBossAtual, "sprite-boss", x < inimigoX);
   if (bossSprite && bossSprite.tagName === "IMG") {
     bossSprite.onerror = function () {
@@ -742,6 +855,8 @@ function desenharBatalha() {
   }
 
   if (guilhermeAtivo) {
+    posicionarSombraChao("sombra-guilherme", guilhermeX, guilhermeY + 200 * 0.42, 200);
+    idsUsados.add("sombra-guilherme");
     const spriteGuilherme = posicionarSprite("guilherme", "GuilermeChucro.jpg", guilhermeX, guilhermeY, 200, 200, "sprite-boss", x < guilhermeX);
     if (spriteGuilherme) idsUsados.add("guilherme");
   }
@@ -792,6 +907,37 @@ function atualizarMovimentoPersonagem(deltaSegundos) {
   }
 }
 
+// ===== Câmera real (Etapa 2) =====
+// Estado da câmera em coordenadas de MUNDO: centro (camCenterX/Y) + zoom
+// (camZoomAtual = pixels de tela por unidade de mundo). Suavizados a cada frame
+// em direção a um alvo recalculado a partir da posição dos lutadores — nunca
+// "teleporta", nunca mostra área fora do mundo (clamps abaixo).
+let camCenterX = 0, camCenterY = 0, camZoomAtual = 0;
+
+const CAMERA_PADDING = 380; // margem extra ao redor da "caixa" dos lutadores
+const CAMERA_ZOOM_MIN = 0.55;
+const CAMERA_ZOOM_MAX = 1.25;
+const CAMERA_SUAVIZACAO_PAN = 0.09;
+const CAMERA_SUAVIZACAO_ZOOM = 0.06;
+
+// Calcula o enquadramento ideal (centro + zoom) a partir da posição de todos os
+// combatentes ativos no momento — se afastam, a câmera abre; se aproximam, fecha.
+function calcularAlvoCameraBatalha(viewportW, viewportH) {
+  let minX = Math.min(x, inimigoX), maxX = Math.max(x, inimigoX);
+  let minY = Math.min(y, inimigoY), maxY = Math.max(y, inimigoY);
+  if (guilhermeAtivo) {
+    minX = Math.min(minX, guilhermeX); maxX = Math.max(maxX, guilhermeX);
+    minY = Math.min(minY, guilhermeY); maxY = Math.max(maxY, guilhermeY);
+  }
+  const centroX = (minX + maxX) / 2;
+  const centroY = (minY + maxY) / 2;
+  const larguraNecessaria = Math.max(1, (maxX - minX) + CAMERA_PADDING * 2);
+  const alturaNecessaria = Math.max(1, (maxY - minY) + CAMERA_PADDING * 2);
+  let zoomAlvo = Math.min(viewportW / larguraNecessaria, viewportH / alturaNecessaria);
+  zoomAlvo = clamp(zoomAlvo, CAMERA_ZOOM_MIN, CAMERA_ZOOM_MAX);
+  return { centroX, centroY, zoomAlvo };
+}
+
 function atualizarCameraBatalha() {
   const viewport = elementosBatalha.viewport;
   const area = elementosBatalha.area;
@@ -799,21 +945,47 @@ function atualizarCameraBatalha() {
 
   const viewportW = Math.max(1, viewport.clientWidth);
   const viewportH = Math.max(1, viewport.clientHeight);
-  const mundoW = canvasBatalha.width;
-  const mundoH = canvasBatalha.height;
 
-  // Câmera FIXA: mostra a arena inteira sempre (sem seguir player/boss, sem zoom
-  // ao atacar/receber dano). camX/camY permanecem 0 (setados em iniciarBatalha),
-  // então o fundo do canvas também é desenhado sem pan — arena inteira visível.
-  const escala = Math.min(viewportW / mundoW, viewportH / mundoH);
-  const offsetX = (viewportW - mundoW * escala) / 2;
-  const offsetY = (viewportH - mundoH * escala) / 2;
-  const transform = `translate(${offsetX}px,${offsetY}px) scale(${escala})`;
-  if (area.dataset.cameraTransform !== transform) {
-    area.style.transformOrigin = "0 0";
-    area.style.transform = transform;
-    area.dataset.cameraTransform = transform;
+  const agoraCam = performance.now();
+  const dtCam = Math.min(3, Math.max(0, ((agoraCam - (atualizarCameraBatalha._ultimo || agoraCam)) / 1000) * 60));
+  atualizarCameraBatalha._ultimo = agoraCam;
+
+  // "Punch" de zoom + screen shake em golpes fortes (Etapa 1), preservado.
+  const dinamica = window.FisicaBatalha ? window.FisicaBatalha.atualizarCamera(dtCam) : { zoomExtra: 0, shakeX: 0, shakeY: 0 };
+
+  const alvo = calcularAlvoCameraBatalha(viewportW, viewportH);
+
+  if (!camZoomAtual) {
+    // Primeiro frame após iniciar a batalha: assume o alvo direto, sem suavizar.
+    camCenterX = alvo.centroX; camCenterY = alvo.centroY; camZoomAtual = alvo.zoomAlvo;
+  } else {
+    const alphaPan = 1 - Math.pow(1 - CAMERA_SUAVIZACAO_PAN, dtCam);
+    const alphaZoom = 1 - Math.pow(1 - CAMERA_SUAVIZACAO_ZOOM, dtCam);
+    camCenterX += (alvo.centroX - camCenterX) * alphaPan;
+    camCenterY += (alvo.centroY - camCenterY) * alphaPan;
+    camZoomAtual += (alvo.zoomAlvo - camZoomAtual) * alphaZoom;
   }
+
+  // Nunca deixa a câmera mostrar área fora do mundo: o centro fica preso a pelo
+  // menos "meia tela" (em unidades de mundo) de cada borda.
+  const meiaLarguraMundo = viewportW / (2 * camZoomAtual);
+  const meiaAlturaMundo = viewportH / (2 * camZoomAtual);
+  const centroClampX = meiaLarguraMundo * 2 > WORLD_W ? WORLD_W / 2 : clamp(camCenterX, meiaLarguraMundo, WORLD_W - meiaLarguraMundo);
+  const centroClampY = meiaAlturaMundo * 2 > WORLD_H ? WORLD_H / 2 : clamp(camCenterY, meiaAlturaMundo, WORLD_H - meiaAlturaMundo);
+
+  const zoomFinal = camZoomAtual * (1 + dinamica.zoomExtra);
+  const offsetX = viewportW / 2 - centroClampX * zoomFinal + dinamica.shakeX;
+  const offsetY = viewportH / 2 - centroClampY * zoomFinal + dinamica.shakeY;
+  const transform = `translate(${offsetX}px,${offsetY}px) scale(${zoomFinal})`;
+  area.style.transformOrigin = "0 0";
+  area.style.transform = transform;
+  area.dataset.cameraTransform = transform;
+
+  // Parallax do fundo (item 6): desloca o fundo só uma fração (PARALLAX_FUNDO) do
+  // quanto a câmera se afastou do centro do mundo — sempre dentro da margem que
+  // sobra da inflação do fundo (nunca revela borda vazia).
+  camX = clamp((centroClampX - WORLD_W / 2) * PARALLAX_FUNDO, -fundoMargemParallaxX, fundoMargemParallaxX);
+  camY = clamp((centroClampY - WORLD_H / 2) * PARALLAX_FUNDO, -fundoMargemParallaxY, fundoMargemParallaxY);
 }
 
 
@@ -930,12 +1102,14 @@ function atirarSkill1(origemX, origemY, dono) {
     dano: stats.dano * (dono === 'player' && typeof getPlayerDamageMultiplier==='function' ? getPlayerDamageMultiplier() : 1) * (dono === 'player' && typeof getPlayerCritChance==='function' && Math.random() < getPlayerCritChance() ? 1.75 : 1) * (dono === 'guilherme' ? MULTIPLICADOR_DANO_GUILHERME : 1), velocidade: stats.velocidade, autoguiado: 0.05,
     dono: dono, criadoEm: Date.now(), spriteId: "poder" + (proximoIdPoder++),
   });
+  if (window.FisicaBatalha) window.FisicaBatalha.esticarAtaque(dono === "player" ? "personagem" : (dono === "guilherme" ? "guilherme" : "inimigo"), 0.1);
 }
 
 function atirarSkill2(dono) {
   const idSkill = dono === "player" ? inventarioAtual.equipados.skill2 : escolherAleatorio(bossKits[bossAtual.tier || bossAtual.id].skill2);
   if (!idSkill || !skill2Defs[idSkill]) return;
   if (dono === "player" && window.playSfx) playSfx('Carregar.mp3', 0.2);
+  if (window.FisicaBatalha) window.FisicaBatalha.esticarAtaque(dono === "player" ? "personagem" : (dono === "guilherme" ? "guilherme" : "inimigo"), 0.18);
   const def = skill2Defs[idSkill];
   const origemX = dono === "player" ? x : (dono === "guilherme" ? guilhermeX : inimigoX);
   const origemY = dono === "player" ? y : (dono === "guilherme" ? guilhermeY : inimigoY);
@@ -1028,6 +1202,8 @@ function atualizarBatalha(timestamp) {
 
   atualizarMovimentoPersonagem(deltaSegundos);
   atualizarMovimentoInimigo(deltaSegundos);
+  if (window.FisicaBatalha) window.FisicaBatalha.atualizarTodos(Math.min(3, Math.max(0, deltaSegundos * 60)));
+  if (window.AmbienteBatalha) window.AmbienteBatalha.atualizar(Math.min(3, Math.max(0, deltaSegundos * 60)), WORLD_W, WORLD_H);
   atualizarCameraBatalha();
 
   // Boss PaulaoDoPneu em 50% de vida: cutscene skipável, depois Guilherme entra na luta.
@@ -1072,6 +1248,7 @@ function atualizarBatalha(timestamp) {
 
   poderes = poderes.filter(function (p) {
     if (distanciaEntre(p.x, p.y, inimigoX, inimigoY) < 60) {
+      const ehSkill2 = String(p.tipoSkill || '').indexOf('__skill2_') === 0;
       vidaEnemy = Math.max(vidaEnemy - p.dano, 0);
       if(typeof registrarDanoMissao==='function')registrarDanoMissao(p.dano);
       registrarDanoServidor(p.dano);
@@ -1079,7 +1256,10 @@ function atualizarBatalha(timestamp) {
       piscarDano("inimigo");
       criarNumeroDano(p.dano, inimigoX, inimigoY - 60, "#ff8a8a");
       atualizarBarrasBatalha();
-      if (String(p.tipoSkill || '').indexOf('__skill2_') === 0 && window.playSfx) playSfx('Impacto.mp3', 0.20);
+      if (ehSkill2 && window.playSfx) playSfx('Impacto.mp3', 0.20);
+      // Física de impacto (separada do dano): knockback + leve reação de câmera.
+      aplicarKnockback("inimigo", p.x, p.y, ehSkill2 ? 3.1 : 1.5);
+      if (window.FisicaBatalha) { window.FisicaBatalha.pulsarZoom(ehSkill2 ? 0.035 : 0.015); if (ehSkill2) window.FisicaBatalha.abalarCamera(3.5); }
       return false;
     }
     return agora - p.criadoEm < VIDA_UTIL_PODER_MS;
@@ -1087,12 +1267,15 @@ function atualizarBatalha(timestamp) {
 
   poderesInimigo = poderesInimigo.filter(function (p) {
     if (distanciaEntre(p.x, p.y, x, y) < 60) {
+      const ehSkill2 = String(p.tipoSkill || '').indexOf('__skill2_') === 0;
       vidaPlay = Math.max(vidaPlay - p.dano * (typeof getPlayerResistanceMultiplier==='function' ? getPlayerResistanceMultiplier() : 1), 0);
       registrarGolpe("inimigo");
       piscarDano("personagem");
       tremerTela();
       criarNumeroDano(p.dano, x, y - 60, "#ffb15c");
       atualizarBarrasBatalha();
+      aplicarKnockback("player", p.x, p.y, ehSkill2 ? 3.1 : 1.5);
+      if (window.FisicaBatalha) { window.FisicaBatalha.pulsarZoom(ehSkill2 ? 0.035 : 0.015); if (ehSkill2) window.FisicaBatalha.abalarCamera(3.5); }
       return false;
     }
     return agora - p.criadoEm < VIDA_UTIL_PODER_MS;
@@ -1110,13 +1293,16 @@ function atualizarBatalha(timestamp) {
         piscarDano("inimigo");
         criarNumeroDano(f.dano, inimigoX, inimigoY - 60, "#ff8a8a");
         if (window.playSfx) playSfx('Impacto.mp3', 0.20);
+        aplicarKnockback("inimigo", f.origemX, f.origemY, 3.6);
       } else {
         vidaPlay = Math.max(vidaPlay - f.dano * (typeof getPlayerResistanceMultiplier==='function' ? getPlayerResistanceMultiplier() : 1), 0);
         registrarGolpe("inimigo");
         piscarDano("personagem");
         tremerTela();
         criarNumeroDano(f.dano, x, y - 60, "#ffb15c");
+        aplicarKnockback("player", f.origemX, f.origemY, 3.6);
       }
+      if (window.FisicaBatalha) { window.FisicaBatalha.pulsarZoom(0.045); window.FisicaBatalha.abalarCamera(4.5); }
       atualizarBarrasBatalha();
     }
     if (!f.jaAcertou) return true;
@@ -1606,6 +1792,8 @@ function aplicarDanoUltimate(dono) {
     tremerTela();
     piscarDano("inimigo");
     criarNumeroDano(danoUltimate, inimigoX, inimigoY - 90, "#ab8406");
+    aplicarKnockback("inimigo", x, y, 6.5);
+    if (window.FisicaBatalha) { window.FisicaBatalha.pulsarZoom(0.09); window.FisicaBatalha.abalarCamera(9); }
   } else {
     // Balanceamento a pedido: a Ultimate do boss causa 35% da vida MÁXIMA atual do
     // jogador (não um valor fixo de tabela) — já que o boss só usa 1x por batalha,
@@ -1619,6 +1807,8 @@ function aplicarDanoUltimate(dono) {
     tremerTela();
     piscarDano("personagem");
     criarNumeroDano(danoUltimate, x, y - 90, "#ff5252");
+    aplicarKnockback("player", inimigoX, inimigoY, 6.5);
+    if (window.FisicaBatalha) { window.FisicaBatalha.pulsarZoom(0.09); window.FisicaBatalha.abalarCamera(9); }
   }
   atualizarBarrasBatalha();
   checarFimDaBatalha();

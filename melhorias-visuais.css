@@ -656,3 +656,544 @@ html { font-size: clamp(13px, 1.1vw + 8px, 18px); }
   transition:transform .15s ease;
 }
 .boss-joystick-knob.arrastando{ transition:none; }
+
+/* ===== Física 2.5D da Batalha — Etapa 1 (aditivo, não mexe em nada existente) ===== */
+.sombra-chao {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 3; /* abaixo de .sprite-jogo (z-index 4), acima do canvas/fundo */
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0,0,0,.55), rgba(0,0,0,0) 78%);
+  transform-origin: center center;
+  will-change: transform, opacity;
+}
+
+/* ===== ETAPA 3: fundação do mundo explorável (exploracao.js) =====
+   Segue o mesmo padrão da tela de batalha (viewport = janela fixa na tela,
+   area = tamanho do mundo, câmera aplicada via transform em #area-exploracao),
+   mas com ids próprios — não compartilha elementos com a batalha. */
+#viewport-exploracao {
+  position:absolute !important;
+  inset:0 !important;
+  width:100% !important;
+  height:100% !important;
+  overflow:hidden !important;
+  contain:layout paint size;
+  touch-action:none;
+}
+#area-exploracao {
+  position:absolute !important;
+  left:0 !important;
+  top:0 !important;
+  width:3000px !important;
+  height:1600px !important;
+  transform-origin:0 0 !important;
+  will-change:transform;
+  overflow:hidden !important;
+}
+#mundo-exploracao-fundo,
+#camada-midground-exploracao,
+#camada-mundo-exploracao,
+#camada-foreground-exploracao {
+  position:absolute !important;
+  left:0 !important;
+  top:0 !important;
+  width:3000px !important;
+  height:1600px !important;
+}
+#camada-foreground-exploracao {
+  pointer-events:none !important;
+  /* Camada preparada pra objetos que passam NA FRENTE do jogador (item 5/6).
+     Vazia por enquanto — só a ordem de empilhamento (fundo < midground < mundo <
+     foreground) já fica pronta pra uso futuro. */
+}
+.poi-marcador {
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+  border:2px dashed rgba(255,255,255,0.35);
+  border-radius:14px;
+  background:rgba(255,255,255,0.05);
+}
+.poi-marcador-label {
+  margin-bottom:8px;
+  padding:4px 10px;
+  border-radius:8px;
+  background:rgba(10,14,28,0.75);
+  color:#e8f2ff;
+  font-weight:800;
+  font-size:.8rem;
+  white-space:nowrap;
+}
+#prompt-interacao-exploracao {
+  position:absolute;
+  left:50%;
+  bottom:120px;
+  transform:translateX(-50%);
+  z-index:20;
+}
+
+/* ===== ETAPA 4: mundo visual/físico (prédios, caminhos, decoração, NPCs) =====
+   Tudo aditivo — nenhuma regra acima foi alterada. Prédios ficam na camada
+   midground (sempre atrás do jogador, mais simples e já cobre bem o objetivo
+   desta etapa); decoração/NPCs ficam na camada "mundo" e usam z-index dinâmico
+   por posição Y pra dar profundidade 2.5D real contra o jogador. */
+.predio-mundo {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  pointer-events:none;
+  filter:drop-shadow(0 10px 14px rgba(0,0,0,.45));
+}
+.predio-telhado {
+  width:100%;
+  height:38%;
+  clip-path:polygon(50% 0%, 100% 100%, 0% 100%);
+  background:linear-gradient(180deg, var(--cor-telhado), var(--cor-predio));
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+  padding-bottom:6px;
+  box-sizing:border-box;
+}
+.predio-emblema {
+  font-size:1.6rem;
+  filter:drop-shadow(0 2px 3px rgba(0,0,0,.6));
+}
+.predio-corpo {
+  width:88%;
+  height:62%;
+  background:linear-gradient(180deg, var(--cor-predio), color-mix(in srgb, var(--cor-predio) 60%, #000 40%));
+  border:2px solid rgba(255,255,255,.12);
+  border-top:none;
+  border-radius:0 0 10px 10px;
+  position:relative;
+  box-sizing:border-box;
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+}
+.predio-porta {
+  width:26%;
+  height:55%;
+  background:rgba(10,10,18,.65);
+  border-radius:6px 6px 0 0;
+  border:1px solid rgba(255,255,255,.15);
+  margin-bottom:0;
+}
+.predio-legenda {
+  margin-top:6px;
+  padding:3px 10px;
+  border-radius:8px;
+  background:rgba(10,14,28,0.78);
+  color:#f2f6ff;
+  font-weight:800;
+  font-size:.78rem;
+  white-space:nowrap;
+}
+
+.decor-mundo, .npc-mundo {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:flex-end;
+  pointer-events:none;
+}
+.decor-sombra, .npc-sombra {
+  width:70%;
+  height:16%;
+  border-radius:50%;
+  background:radial-gradient(closest-side, rgba(0,0,0,.5), rgba(0,0,0,0) 78%);
+  margin-top:-4px;
+}
+.decor-emblema {
+  font-size:1.9rem;
+  line-height:1;
+  filter:drop-shadow(0 3px 4px rgba(0,0,0,.5));
+}
+.decor-arvore .decor-emblema { font-size:2.6rem; }
+.decor-banco .decor-emblema, .decor-poste .decor-emblema { font-size:1.5rem; }
+
+.npc-emblema {
+  font-size:2.1rem;
+  filter:drop-shadow(0 3px 4px rgba(0,0,0,.5));
+}
+.npc-nome {
+  margin-top:2px;
+  padding:1px 7px;
+  border-radius:6px;
+  background:rgba(10,14,28,0.7);
+  color:#dbe7ff;
+  font-size:.62rem;
+  font-weight:700;
+  white-space:nowrap;
+}
+
+/* Estado idle/walk preparado (item 11) — hoje só uma leve respiração no
+   parado; a troca de spritesheet real pode plugar aqui sem mexer no JS. */
+.battle-screen #camada-mundo-exploracao .sprite-jogo[data-estado="idle"] {
+  animation: expIdleRespiro 2.2s ease-in-out infinite;
+}
+@keyframes expIdleRespiro {
+  0%, 100% { filter:none; }
+  50% { filter:brightness(1.02); }
+}
+
+/* =====================================================================
+   ETAPA 7 — Universo 1 ganha vida: vento/folhas, brilho em locais
+   importantes (Escola/Arena) e NPCs com estado de missão (item 1/3/4/5/
+   6/7/9/10 do roteiro). 100% aditivo — nenhuma regra acima foi alterada.
+   ===================================================================== */
+
+/* Vento leve em arbustos/árvores — CSS puro, sem custo de JS por frame. */
+.decor-arbusto .decor-emblema,
+.decor-arvore .decor-emblema {
+  transform-origin: bottom center;
+}
+.decor-arbusto .decor-emblema { animation: expVentoArbusto 3.4s ease-in-out infinite; }
+.decor-arvore .decor-emblema { animation: expVentoArvore 5s ease-in-out infinite; }
+@keyframes expVentoArbusto {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg); }
+}
+@keyframes expVentoArvore {
+  0%, 100% { transform: rotate(-1.4deg); }
+  50% { transform: rotate(1.4deg); }
+}
+
+/* Canvas de clima (vento/folhas/partículas) — fica por cima do mundo, mas
+   nunca bloqueia toque/clique (pointer-events:none). Atualizado com um
+   número pequeno e fixo de partículas (ver exploracao.js). */
+#clima-exploracao {
+  position:absolute !important;
+  inset:0 !important;
+  width:100% !important;
+  height:100% !important;
+  pointer-events:none !important;
+  z-index:5;
+}
+
+/* Escola e Arena — leve pulso de luz pra parecer "lugar importante", sem
+   nenhum asset novo (item 9/10 do roteiro). */
+.predio-escola { animation: expBrilhoEscola 3.2s ease-in-out infinite; }
+.predio-arena { animation: expBrilhoArena 2.6s ease-in-out infinite; }
+@keyframes expBrilhoEscola {
+  0%, 100% { filter:drop-shadow(0 10px 14px rgba(0,0,0,.45)) drop-shadow(0 0 0 rgba(123,150,255,0)); }
+  50% { filter:drop-shadow(0 10px 14px rgba(0,0,0,.45)) drop-shadow(0 0 18px rgba(123,150,255,.55)); }
+}
+@keyframes expBrilhoArena {
+  0%, 100% { filter:drop-shadow(0 10px 14px rgba(0,0,0,.45)) drop-shadow(0 0 0 rgba(255,90,90,0)); }
+  50% { filter:drop-shadow(0 10px 14px rgba(0,0,0,.45)) drop-shadow(0 0 16px rgba(255,90,90,.5)); }
+}
+
+/* Badge de estado da missão sobre o NPC (item 6 do roteiro). */
+.npc-mundo { position:relative; }
+.npc-badge {
+  position:absolute;
+  top:-14px;
+  right:2px;
+  min-width:20px;
+  height:20px;
+  padding:0 4px;
+  border-radius:50%;
+  background:#ffcf4a;
+  color:#241b00;
+  font-size:.72rem;
+  font-weight:900;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 2px 6px rgba(0,0,0,.5);
+  animation: expBadgePulso 1.4s ease-in-out infinite;
+  z-index:2;
+}
+.npc-badge.em-andamento { background:#7fb8ff; color:#08213f; animation:none; }
+.npc-badge.concluida { background:#5cffb0; color:#03210f; animation:none; }
+.npc-badge.hidden { display:none; }
+@keyframes expBadgePulso {
+  0%, 100% { transform:scale(1); }
+  50% { transform:scale(1.18); }
+}
+
+/* Modal de diálogo do NPC (item 5/6/7 do roteiro) — mesma linguagem visual
+   dos modais já existentes (.overlay/.modal-box/.modal-action). */
+#modal-npc-dialogo .modal-box { max-width:340px; }
+.npc-dialogo-nome { margin:0 0 6px; font-size:1.05rem; }
+.npc-dialogo-texto { margin:0 0 12px; color:#dbe7ff; font-size:.92rem; line-height:1.4; }
+.npc-dialogo-missao {
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:10px;
+  padding:10px 12px;
+  margin-bottom:12px;
+  text-align:left;
+}
+.npc-dialogo-missao h4 { margin:0 0 4px; font-size:.86rem; color:#f2f6ff; }
+.npc-dialogo-missao .mission-progress { margin:6px 0 4px; }
+.npc-dialogo-missao small { color:#9aa3c7; font-size:.72rem; }
+.npc-dialogo-missao.hidden { display:none; }
+
+/* HUD discreta de missão em foco (item 7 do roteiro) — pequena, canto
+   superior direito; não ocupa área central nem os controles, funciona bem
+   em celular landscape. */
+#hud-missao-exploracao {
+  position:absolute;
+  top:10px;
+  right:10px;
+  max-width:180px;
+  padding:6px 10px;
+  border-radius:10px;
+  background:rgba(10,14,28,0.72);
+  border:1px solid rgba(255,255,255,0.12);
+  color:#f2f6ff;
+  z-index:15;
+  pointer-events:none;
+}
+#hud-missao-exploracao .hud-missao-titulo {
+  font-size:.64rem;
+  font-weight:800;
+  letter-spacing:.04em;
+  color:#9aa3c7;
+  margin:0 0 2px;
+}
+#hud-missao-exploracao .hud-missao-nome {
+  font-size:.76rem;
+  font-weight:700;
+  margin:0 0 4px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+#hud-missao-exploracao .mission-progress { margin:0 0 3px; }
+#hud-missao-exploracao small { font-size:.64rem; color:#9aa3c7; }
+#hud-missao-exploracao.hidden { display:none; }
+
+/* =====================================================================
+   ETAPA 8 — vegetação mais natural, identidade própria da Loja e uma
+   camada leve de iluminação ambiente. 100% aditivo — nenhuma regra acima
+   foi alterada; só novas classes e uma pseudo-camada por cima do viewport.
+   ===================================================================== */
+
+/* Novos tipos de decoração (item 2 do roteiro): flores, mato, folhas soltas
+   e os 2 pontos "segredo visual" (pedra mágica / clareira). Tamanhos pequenos
+   de propósito — reforçam detalhe sem competir com árvores/prédios. */
+.decor-flor .decor-emblema { font-size:1.1rem; }
+.decor-grama .decor-emblema { font-size:1.3rem; }
+.decor-folha .decor-emblema { font-size:1rem; opacity:.85; }
+
+.decor-flor .decor-emblema,
+.decor-grama .decor-emblema {
+  transform-origin: bottom center;
+  animation: expVentoArbusto 3s ease-in-out infinite;
+}
+.decor-folha .decor-emblema {
+  animation: expFolhaBalanco 4.2s ease-in-out infinite;
+}
+@keyframes expFolhaBalanco {
+  0%, 100% { transform: rotate(-6deg) translateY(0); }
+  50% { transform: rotate(6deg) translateY(-2px); }
+}
+
+/* Pequenos segredos visuais (item 14) — discretos, mas com um brilho sutil
+   que convida o jogador a se aproximar, sem indicar nenhuma ação/recompensa. */
+.decor-pedra-magica .decor-emblema {
+  font-size:1.6rem;
+  animation: expBrilhoSegredo 2.8s ease-in-out infinite;
+}
+.decor-clareira .decor-emblema {
+  font-size:1.3rem;
+  opacity:.8;
+  animation: expBrilhoSegredo 3.6s ease-in-out infinite;
+}
+@keyframes expBrilhoSegredo {
+  0%, 100% { filter:drop-shadow(0 3px 4px rgba(0,0,0,.5)) drop-shadow(0 0 0 rgba(150,225,255,0)); }
+  50% { filter:drop-shadow(0 3px 4px rgba(0,0,0,.5)) drop-shadow(0 0 10px rgba(150,225,255,.65)); }
+}
+
+/* Loja ganha identidade visual própria (item 5 do roteiro) — pulso dourado
+   diferente do azul da Escola e do vermelho da Arena. */
+.predio-loja { animation: expBrilhoLoja 3.6s ease-in-out infinite; }
+@keyframes expBrilhoLoja {
+  0%, 100% { filter:drop-shadow(0 10px 14px rgba(0,0,0,.45)) drop-shadow(0 0 0 rgba(255,205,90,0)); }
+  50% { filter:drop-shadow(0 10px 14px rgba(0,0,0,.45)) drop-shadow(0 0 14px rgba(255,205,90,.5)); }
+}
+
+/* Iluminação ambiente leve (item 11 do roteiro) — vinheta suave só por cima
+   do mundo, sem filtro pesado nenhum e sem bloquear toque/clique. Aumenta a
+   sensação de profundidade sem custar nada por frame (é CSS estático). */
+#viewport-exploracao::after {
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  z-index:6;
+  background: radial-gradient(circle at 50% 42%, rgba(0,0,0,0) 45%, rgba(6,10,20,.35) 100%);
+}
+
+/* =====================================================================
+   ETAPA 9 — NPCs mais vivos (respiração/balanço sutil + leve contraste
+   pra se destacarem da grama) e pequena melhoria de composição da praça.
+   100% aditivo — nenhuma regra acima foi alterada.
+   ===================================================================== */
+
+/* Animação idle extremamente sutil (item 1 do roteiro): um respiro vertical
+   pequeno + leve balanço, cada NPC com timing levemente diferente (via
+   nth-of-type) pra não parecerem sincronizados/robóticos. Não mexe em
+   posição real (só transform visual), então não afeta raio de interação. */
+.npc-mundo .npc-emblema {
+  transform-origin: bottom center;
+  animation: npcRespiro 2.6s ease-in-out infinite;
+}
+.npc-mundo[data-npc-id="npc2"] .npc-emblema { animation-duration: 2.9s; animation-delay: -0.6s; }
+.npc-mundo[data-npc-id="npc3"] .npc-emblema { animation-duration: 3.2s; animation-delay: -1.3s; }
+@keyframes npcRespiro {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-2px) rotate(0.6deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .npc-mundo .npc-emblema { animation: none; }
+}
+
+/* Pequeno contraste/iluminação (item 13) — separa o NPC de fundos com muito
+   detalhe (grama/flores), sem filtro pesado nenhum. */
+.npc-mundo .npc-emblema {
+  filter: drop-shadow(0 3px 4px rgba(0,0,0,.5)) drop-shadow(0 0 6px rgba(0,0,0,.25));
+}
+
+/* Tema cosmético do universo (item 13/14 do roteiro) — só texto informativo. */
+.universo-tema {
+  font-size:.68rem;
+  color:#9aa3c7;
+  margin:0 0 6px;
+  font-style:italic;
+}
+
+/* =============================================================================
+   ETAPA 11 — Interior da Escola (aditivo, só CSS novo — nada existente foi
+   alterado). Reaproveita a MESMA camada #camada-mundo-exploracao; o wrapper
+   #interior-escola-wrapper é escondido/mostrado por JS (display inline), e
+   estas regras só cuidam de esconder o mundo exterior enquanto ativo.
+   ============================================================================= */
+#area-exploracao.dentro-interior .elemento-exterior,
+#area-exploracao.dentro-interior #camada-midground-exploracao {
+  display: none;
+}
+
+.interior-piso {
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(80,55,140,0.55), rgba(28,18,52,0.82));
+  border: 2px solid rgba(150,225,255,0.22);
+  box-shadow: inset 0 0 50px rgba(0,0,0,0.5);
+}
+
+.interior-parede {
+  background: rgba(18,14,36,0.92);
+  border: 1px solid rgba(150,225,255,0.16);
+  border-radius: 4px;
+}
+
+.interior-porta-marca {
+  background: radial-gradient(ellipse at center, rgba(150,225,255,0.35), rgba(150,225,255,0) 70%);
+}
+
+.interior-objeto {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,.5));
+}
+
+/* =============================================================================
+   ETAPA 12 — Interiores da Loja e da Arena (aditivo). Reaproveitam as MESMAS
+   classes-base .interior-piso/.interior-parede/.interior-objeto criadas na
+   Etapa 11; aqui só entram variações visuais (madeira/pedra x pedra/combate)
+   pra não parecerem cópias da Escola.
+   ============================================================================= */
+
+/* ----- Loja: madeira/pedra + iluminação quente ----- */
+.interior-piso-loja {
+  background: linear-gradient(180deg, rgba(122,90,18,0.55), rgba(58,40,14,0.82));
+  border-color: rgba(255,210,140,0.28);
+  box-shadow: inset 0 0 46px rgba(0,0,0,0.45);
+}
+.interior-parede-loja {
+  background: rgba(58,38,20,0.92);
+  border-color: rgba(255,210,140,0.20);
+}
+
+/* ----- Arena: pedra + piso circular + iluminação de combate ----- */
+.interior-piso-arena {
+  border-radius: 50%;
+  background: radial-gradient(circle at center, rgba(120,40,40,0.55), rgba(35,20,20,0.85) 75%);
+  border-color: rgba(255,150,120,0.30);
+  box-shadow: inset 0 0 60px rgba(0,0,0,0.5);
+}
+.interior-parede-arena {
+  background: rgba(40,32,32,0.92);
+  border-color: rgba(255,150,120,0.18);
+}
+
+/* =============================================================================
+   ETAPA 13 — Polimento visual do Universo 1 (100% aditivo — nenhuma regra
+   acima foi alterada). Só estiliza os NOVOS tipos de decoração adicionados
+   em exploracao.js (runa-escola/caixa-loja/frasco-loja/bandeira-arena/
+   tocha-arena) e reforça a atmosfera já existente de cada prédio.
+   ============================================================================= */
+
+/* Escola — pequenos símbolos mágicos perto da entrada (item 7), brilho
+   suave e lento, reaproveitando o MESMO keyframe de brilho azul da Escola. */
+.decor-runa-escola .decor-emblema {
+  font-size: 1.15rem;
+  opacity: .85;
+  animation: expBrilhoSegredo 3s ease-in-out infinite;
+}
+
+/* Loja — caixas/frascos decorativos perto do balcão externo (item 8),
+   com um leve balanço igual ao já usado em flor/grama, reforçando a
+   sensação de "loja viva" sem nenhuma animação nova. */
+.decor-caixa-loja .decor-emblema,
+.decor-frasco-loja .decor-emblema {
+  font-size: 1.3rem;
+  transform-origin: bottom center;
+  animation: expVentoArbusto 3.6s ease-in-out infinite;
+}
+
+/* Arena — bandeiras e tocha do lado de fora (item 9): bandeiras balançam
+   como a vegetação já balança; a tocha usa o MESMO brilho pulsante já
+   usado nos segredos visuais, só que em tom quente (via hue-rotate leve,
+   sem precisar de um novo @keyframes). */
+.decor-bandeira-arena .decor-emblema {
+  font-size: 1.5rem;
+  transform-origin: top center;
+  animation: expVentoArbusto 2.4s ease-in-out infinite;
+}
+.decor-tocha-arena .decor-emblema {
+  font-size: 1.4rem;
+  animation: expBrilhoSegredo 1.8s ease-in-out infinite;
+  filter: drop-shadow(0 3px 4px rgba(0,0,0,.5)) hue-rotate(-40deg);
+}
+
+/* Aura mágica discreta no chão da Escola (item 5/6) — um único pseudo-
+   elemento estático (sem novo DOM, sem novo loop), reforçando "aqui existe
+   magia" perto do prédio mais importante do Universo 1. */
+.predio-escola { position: relative; }
+.predio-escola::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -14px;
+  width: 70%;
+  height: 26px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(123,150,255,.35), rgba(123,150,255,0) 72%);
+  animation: expAuraEscola 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes expAuraEscola {
+  0%, 100% { opacity: .5; }
+  50% { opacity: 1; }
+}

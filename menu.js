@@ -461,6 +461,7 @@ function show(id) {
   if (id === 'tela-banner') renderBanner();
   if (id === 'tela-giro-diario') renderDailyWheel();
   if (id === 'tela-bosses') renderBosses();
+  if (id === 'tela-universos' && window.ArcaneUniversos) window.ArcaneUniversos.renderUniversos();
   if (id === 'tela-personagens') renderCharacters();
   if (id === 'tela-missoes') renderMissions();
   if (id === 'tela-gamepass') renderGamepasses();
@@ -2515,7 +2516,7 @@ function renderInventory(tab = inventoryActiveTab) {
       return `<article class="pet-style-card inventory-unit ${rarityInfo[p.raridade]?.cls || ''} ${equipados.imagem === id ? 'equipped' : ''} ${isFused ? 'character-fused' : ''}" style="--rarity:${rarityColor(p.raridade)}">
       <div class="pet-card-top"><span class="rarity-label">${p.tier}</span><span class="pet-count">#${index + 1}</span></div>
       ${isFused ? '<div class="fused-badge">★ FUNDIDO</div>' : ''}
-      <div class="pet-media asset-frame">${mediaCard(p.id === 'KauanBanner' ? 'KauanBanner.webp' : p.arquivo, p.nome.slice(0,2).toUpperCase())}</div>
+      <div class="pet-media asset-frame">${mediaCard(p.id === 'KauanBanner' ? 'KauanBanner_static.webp' : p.arquivo, p.nome.slice(0,2).toUpperCase())}</div>
       <div class="pet-name-row"><h3>${p.nome}</h3>${equipados.imagem === id ? '<span class="equipped-mini">✓ EQUIPADO</span>' : ''}</div>
       <div class="pet-rarity">${p.tier}</div><p>${p.buff}</p>
       <div class="current-damage">⚔ Dano atual: +${danoAtualPercent(p, isFused)}%</div>
@@ -3046,6 +3047,14 @@ async function aoVencerBatalha(bossId, moedas, diamantes) {
     window.arcaneBattleStartedAt = 0;
 
     await sincronizarEstadoDoServidor();
+
+    // Deixa a arquitetura de universos (universos.js) detectar se um novo
+    // universo acabou de abrir com este boss derrotado. Reaproveita
+    // bossesDerrotados já atualizado por sincronizarEstadoDoServidor() acima
+    // — nenhuma lógica de vitória/progresso nova é criada aqui.
+    if (window.ArcaneUniversos && typeof window.ArcaneUniversos.aoAtualizarProgresso === 'function') {
+      window.ArcaneUniversos.aoAtualizarProgresso();
+    }
 
     if (Number(bossId) === 1 && typeof avancarTutorialVisual === 'function') avancarTutorialVisual(3);
 
