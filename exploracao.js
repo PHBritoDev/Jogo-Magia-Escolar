@@ -1710,6 +1710,12 @@
     prepararCamadaMundo();
     prepararClima();
     atualizarInteracaoProxima();
+    // ETAPA 16 (item 4 do roteiro) — garante que o PRIMEIRO frame já nasça
+    // com a câmera correta (não precisa de redimensionar a janela pra
+    // "acordar"): mede o viewport agora mesmo, antes de pedir o primeiro
+    // frame, e liga o ResizeObserver que mantém isso correto depois.
+    atualizarCameraExploracao(0);
+    iniciarObservadorResizeExploracao();
     ultimoFrameExp = 0;
     if (rafExploracaoId === null) rafExploracaoId = requestAnimationFrame(loopExploracao);
 
@@ -1751,6 +1757,37 @@
     if (exploracaoAtiva) atualizarCameraExploracao(0);
     redimensionarClima();
   }, { passive: true });
+
+  // ---------------------------------------------------------------------
+  // ETAPA 16 (item 3 do roteiro) — RESIZE ROBUSTO via ResizeObserver.
+  // -----------------------------------------------------------------------
+  // O listener de "resize" da window (acima) só dispara quando a JANELA
+  // muda de tamanho. Ele não cobre os casos reais que causavam o bug
+  // ("mapa preto até eu mexer no width/height"): a tela de exploração
+  // ficando visível sem a window em si ter sido redimensionada, ou o
+  // navegador levando um instante a mais pra assentar a altura real
+  // (100dvh reagindo à barra de endereço) depois que a classe ".active" é
+  // aplicada em #tela-exploracao.
+  //
+  // ResizeObserver é a API correta pra isso: ele observa o TAMANHO REAL do
+  // próprio elemento (não a window) e chama o callback sempre que esse
+  // tamanho muda de verdade — inclusive na primeira vez que passa a ter um
+  // tamanho válido. Nenhum setTimeout/intervalo arbitrário é usado.
+  //
+  // Importante (item 3): isso só atualiza viewport/canvas/câmera — nunca
+  // recria o mundo, NPCs, obstáculos ou reseta posição/progresso do
+  // jogador (definirSpawnExploracao não é chamado aqui).
+  let resizeObserverExp = null;
+  function iniciarObservadorResizeExploracao() {
+    if (resizeObserverExp || typeof ResizeObserver === "undefined") return;
+    const viewport = document.getElementById("viewport-exploracao");
+    if (!viewport) return;
+    resizeObserverExp = new ResizeObserver(function () {
+      if (exploracaoAtiva) atualizarCameraExploracao(0);
+      redimensionarClima();
+    });
+    resizeObserverExp.observe(viewport);
+  }
 
   const navBtn = document.getElementById("nav-exploracao");
   if (navBtn) navBtn.addEventListener("click", function () { iniciarExploracao(); });

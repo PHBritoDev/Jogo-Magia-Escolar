@@ -674,13 +674,38 @@ html { font-size: clamp(13px, 1.1vw + 8px, 18px); }
    Segue o mesmo padrão da tela de batalha (viewport = janela fixa na tela,
    area = tamanho do mundo, câmera aplicada via transform em #area-exploracao),
    mas com ids próprios — não compartilha elementos com a batalha. */
+/* ETAPA 16 (item 2/4 do roteiro) — altura de segurança só para esta tela.
+   `.screen` (visual.css) já usa `height:100vh; height:100dvh;`, mas em
+   alguns WebViews mais antigos (ex.: o do Acode) o recálculo de 100dvh
+   quando a barra de endereço/teclado muda pode atrasar ou zerar por um
+   instante — e é exatamente essa a tela cuja câmera depende de medir
+   #viewport-exploracao corretamente já no primeiro frame. `--altura-real`
+   já existe (calculada em index.html a partir de window.innerHeight, uma
+   API sem essa ambiguidade) mas não tinha nenhum consumidor no CSS — só
+   aplicamos aqui, como reforço, sem mexer nas outras telas. */
+#tela-exploracao {
+  height: var(--altura-real, 100dvh);
+}
 #viewport-exploracao {
   position:absolute !important;
   inset:0 !important;
   width:100% !important;
   height:100% !important;
   overflow:hidden !important;
-  contain:layout paint size;
+  /* ETAPA 16 (item 2/3 do roteiro): a auditoria comparou este viewport com o
+     #viewport-jogo da batalha (que nunca teve o problema de tela preta) e a
+     única diferença estrutural relevante era o "size" aqui em contain. Com
+     "size", o navegador tem permissão de tratar o tamanho deste elemento
+     como independente do conteúdo MESMO quando o cálculo de layout externo
+     (ex.: 100dvh em telas/telas com barra de endereço dinâmica) demora a
+     assentar — em alguns WebViews isso fez o viewport ser medido como 0x0
+     no primeiro layout, jogando o mundo (via transform) todo pra fora da
+     tela = exploração preta/vazia. #viewport-jogo nunca usou "size" e nunca
+     teve esse sintoma. Mantemos só "layout paint" (ainda evita que o mundo
+     3000x1600 dentro dele afete o layout de fora, que é o que "contain"
+     precisa garantir aqui) e tiramos "size".
+  */
+  contain:layout paint;
   touch-action:none;
 }
 #area-exploracao {
@@ -1210,14 +1235,23 @@ html { font-size: clamp(13px, 1.1vw + 8px, 18px); }
    abaixo é dedicado só à galáxia.
    Leve para celular: sem canvas, sem partículas animadas por JS — só CSS
    (gradientes estáticos + poucas animações simples de opacidade/escala).
+
+   ETAPA 16 (item 5/6 do roteiro) — a Galáxia agora é a primeira tela real
+   do jogo, então passou a ocupar quase toda a área útil da tela (antes
+   travada em max-width:640px/72vh, o que fazia os "planetas" parecerem
+   cards pequenos perdidos no fundo). O container agora cresce (flex:1)
+   dentro do #tela-universos, que é um .panel-screen em coluna — nenhuma
+   outra tela (.panel-screen) é afetada, essa regra é só do #grid-universos.
    ============================================================================= */
 .galaxy-map {
   position: relative;
   width: 100%;
-  max-width: 640px;
+  max-width: 1180px;
   margin: 0 auto;
-  aspect-ratio: 3 / 4;
-  max-height: 72vh;
+  flex: 1 1 auto;
+  min-height: 0;
+  aspect-ratio: 4 / 5;
+  max-height: min(84vh, 84dvh, 980px);
   border-radius: 22px;
   overflow: hidden;
   border: 1px solid rgba(123, 92, 255, .28);
@@ -1282,10 +1316,19 @@ html { font-size: clamp(13px, 1.1vw + 8px, 18px); }
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
+/* ETAPA 16 (item 6 do roteiro) — área de toque generosa: um pseudo-elemento
+   invisível bem maior que o "planeta" visual garante um alvo confortável
+   no celular sem precisar aumentar o círculo visível além da conta. */
+.universo-node::before {
+  content: "";
+  position: absolute;
+  inset: -20px;
+  border-radius: 50%;
+}
 
 .universo-node-anel {
   position: absolute;
-  inset: -8px;
+  inset: -10px;
   border-radius: 50%;
   border: 2px solid var(--universo-cor, #7b5cff);
   opacity: .55;
@@ -1298,15 +1341,15 @@ html { font-size: clamp(13px, 1.1vw + 8px, 18px); }
 
 .universo-node-corpo {
   position: relative;
-  width: 52px;
-  height: 52px;
+  width: 92px;
+  height: 92px;
   border-radius: 50%;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
   background: radial-gradient(circle at 35% 30%, var(--universo-cor, #7b5cff), rgba(10,10,25,.9) 78%);
-  box-shadow: 0 0 16px 2px color-mix(in srgb, var(--universo-cor, #7b5cff) 55%, transparent);
+  box-shadow: 0 0 22px 4px color-mix(in srgb, var(--universo-cor, #7b5cff) 55%, transparent);
   border: 2px solid rgba(255,255,255,.18);
 }
 .universo-node-corpo img {
@@ -1315,18 +1358,18 @@ html { font-size: clamp(13px, 1.1vw + 8px, 18px); }
   object-fit: cover;
 }
 .universo-node-fallback {
-  font-size: 1.3rem;
+  font-size: 2rem;
 }
 
 .universo-node-selo {
   position: absolute;
   top: -4px;
   right: -2px;
-  font-size: .62rem;
+  font-size: .78rem;
   background: rgba(8,10,22,.9);
   border-radius: 50%;
-  width: 18px;
-  height: 18px;
+  width: 26px;
+  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1334,14 +1377,14 @@ html { font-size: clamp(13px, 1.1vw + 8px, 18px); }
 }
 
 .universo-node-label {
-  font-size: .56rem;
+  font-size: .72rem;
   font-weight: 800;
   letter-spacing: .02em;
   color: #dfe4ff;
   text-align: center;
   line-height: 1.15;
   text-shadow: 0 1px 4px rgba(0,0,0,.9);
-  max-width: 70px;
+  max-width: 100px;
 }
 
 .universo-node.locked .universo-node-corpo {
@@ -1374,8 +1417,9 @@ html { font-size: clamp(13px, 1.1vw + 8px, 18px); }
 }
 
 @media (max-width: 420px) {
-  .universo-node-corpo { width: 44px; height: 44px; }
-  .universo-node-label { font-size: .5rem; max-width: 58px; }
+  .universo-node-corpo { width: 72px; height: 72px; }
+  .universo-node-label { font-size: .62rem; max-width: 78px; }
+  .universo-node-selo { width: 22px; height: 22px; font-size: .68rem; }
 }
 
 /* --- Preview de universo (confirmação antes de entrar) --- */

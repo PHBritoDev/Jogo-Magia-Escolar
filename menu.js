@@ -2688,11 +2688,17 @@ async function startBoss(id) {
 window.startBoss = startBoss;
 window.renderBosses = renderBosses;
 
+// ETAPA 16 (item 1 do roteiro): a Arena/lista de bosses deixou de ser
+// acessível diretamente pelo botão principal. O fluxo correto agora é
+// sempre Galáxia → Universo → Exploração → Arena → Boss. Este botão passa
+// a levar para a tela de Universos (mesmo destino do nav-card "Universos"),
+// e não mais direto pra tela-bosses. show('tela-universos') já dispara
+// window.ArcaneUniversos.renderUniversos() sozinho (ver função show()),
+// então nenhuma lógica nova é criada aqui.
 const btnPlay = document.getElementById('btn-play');
 if (btnPlay) {
   btnPlay.addEventListener('click', () => {
-    renderBosses();
-    show('tela-bosses');
+    show('tela-universos');
   });
 }
 
