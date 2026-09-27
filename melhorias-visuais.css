@@ -671,9 +671,10 @@ html { font-size: clamp(13px, 1.1vw + 8px, 18px); }
 }
 
 /* ===== ETAPA 3: fundação do mundo explorável (exploracao.js) =====
-   Segue o mesmo padrão da tela de batalha (viewport = janela fixa na tela,
-   area = tamanho do mundo, câmera aplicada via transform em #area-exploracao),
-   mas com ids próprios — não compartilha elementos com a batalha. */
+   Viewport = janela fixa na tela, area = tamanho do mundo (3000x1600),
+   câmera aplicada via left/top + zoom em #area-exploracao (ver comentário
+   na regra #area-exploracao logo abaixo pro motivo de não ser mais
+   transform) — ids próprios, não compartilha elementos com a batalha. */
 /* ETAPA 16 (item 2/4 do roteiro) — altura de segurança só para esta tela.
    `.screen` (visual.css) já usa `height:100vh; height:100dvh;`, mas em
    alguns WebViews mais antigos (ex.: o do Acode) o recálculo de 100dvh
@@ -692,39 +693,43 @@ html { font-size: clamp(13px, 1.1vw + 8px, 18px); }
   width:100% !important;
   height:100% !important;
   overflow:hidden !important;
-  /* ETAPA 16 (item 2/3 do roteiro): a auditoria comparou este viewport com o
-     #viewport-jogo da batalha (que nunca teve o problema de tela preta) e a
-     única diferença estrutural relevante era o "size" aqui em contain. Com
-     "size", o navegador tem permissão de tratar o tamanho deste elemento
-     como independente do conteúdo MESMO quando o cálculo de layout externo
-     (ex.: 100dvh em telas/telas com barra de endereço dinâmica) demora a
-     assentar — em alguns WebViews isso fez o viewport ser medido como 0x0
-     no primeiro layout, jogando o mundo (via transform) todo pra fora da
-     tela = exploração preta/vazia. #viewport-jogo nunca usou "size" e nunca
-     teve esse sintoma. Mantemos só "layout paint" (ainda evita que o mundo
-     3000x1600 dentro dele afete o layout de fora, que é o que "contain"
-     precisa garantir aqui) e tiramos "size".
-  */
-  contain:layout paint;
+  contain:layout;
   touch-action:none;
 }
 #area-exploracao {
+  /* CORREÇÃO DE CAUSA RAIZ (bug da tela preta no WebView do Acode):
+     antes, essa câmera era movida com `transform:translate()scale()`.
+     Um elemento deste tamanho (3000x1600) sendo transformado força o
+     navegador a tentar rasterizar a camada inteira numa textura de GPU —
+     em WebViews mais simples essa textura gigante simplesmente não
+     aparece. Por isso `left`/`top` aqui NÃO têm `!important`: o JS
+     (exploracao.js) precisa poder reposicionar este elemento a cada
+     frame com posicionamento normal, sem `transform`. A escala agora é
+     feita com `zoom` (não força camada de GPU do mesmo jeito). */
   position:absolute !important;
-  left:0 !important;
-  top:0 !important;
+  left:0;
+  top:0;
   width:3000px !important;
   height:1600px !important;
-  transform-origin:0 0 !important;
-  will-change:transform;
   overflow:hidden !important;
 }
 #mundo-exploracao-fundo,
-#camada-midground-exploracao,
 #camada-mundo-exploracao,
 #camada-foreground-exploracao {
   position:absolute !important;
   left:0 !important;
   top:0 !important;
+  width:3000px !important;
+  height:1600px !important;
+}
+#camada-midground-exploracao {
+  /* Mesma correção acima: essa camada faz parallax (se move um pouco
+     menos que o mundo). Antes usava `transform:translate()`; agora o JS
+     (prepararMidground/atualizarCameraExploracao) posiciona com
+     `left`/`top` normais — por isso, sem `!important` aqui também. */
+  position:absolute !important;
+  left:0;
+  top:0;
   width:3000px !important;
   height:1600px !important;
 }

@@ -809,17 +809,32 @@
 
     const offsetX = viewportW / 2 - centroX * camExp.zoom;
     const offsetY = viewportH / 2 - centroY * camExp.zoom;
-    area.style.transformOrigin = "0 0";
-    area.style.transform = `translate(${offsetX}px,${offsetY}px) scale(${camExp.zoom})`;
+    // CORREÇÃO DE CAUSA RAIZ (bug da tela preta no WebView do Acode): antes,
+    // essa câmera movia #area-exploracao (3000x1600px) com
+    // `transform:translate()scale()`. Um elemento desse tamanho sendo
+    // transformado força o navegador a tentar rasterizar a camada inteira
+    // numa textura de GPU — e em WebViews mais simples (como o do Acode)
+    // essa textura gigante simplesmente não é desenhada, mesmo com toda a
+    // lógica de câmera/viewport calculada certa por dentro. A troca abaixo
+    // usa posicionamento normal (`left`/`top`, sem GPU layer) e a
+    // propriedade `zoom` só pra escala — jogador, câmera, NPCs, prédios,
+    // Supabase etc. continuam exatamente iguais por dentro, só muda COMO
+    // essa camada é movida na tela.
+    area.style.left = offsetX + "px";
+    area.style.top = offsetY + "px";
+    area.style.zoom = camExp.zoom;
 
     // Parallax leve do midground (camadas do mundo, item 6): a camada de estruturas
     // se desloca um pouco menos que o mundo real, reforçando profundidade.
+    // Mesma correção acima: left/top em vez de transform (midground também
+    // é do tamanho do mundo inteiro).
     const midground = document.getElementById("camada-midground-exploracao");
     if (midground) {
       const fatorParallax = 0.5;
       const dx = (centroX - WORLD_W / 2) * (1 - fatorParallax);
       const dy = (centroY - WORLD_H / 2) * (1 - fatorParallax);
-      midground.style.transform = `translate(${-dx}px,${-dy}px)`;
+      midground.style.left = (-dx) + "px";
+      midground.style.top = (-dy) + "px";
     }
   }
 
@@ -1062,7 +1077,6 @@
     midground.style.width = WORLD_W + "px";
     midground.style.height = WORLD_H + "px";
     midground.style.pointerEvents = "none";
-    midground.style.willChange = "transform";
 
     construcoesMundo.forEach(function (c) {
       const predio = document.createElement("div");
@@ -1670,15 +1684,22 @@
 
   function loopExploracao(timestamp) {
     if (!exploracaoAtiva) { rafExploracaoId = null; return; }
-    const deltaSegundos = Math.min(0.05, Math.max(0, (timestamp - (ultimoFrameExp || timestamp)) / 1000));
-    ultimoFrameExp = timestamp;
-    const dt60 = Math.min(3, Math.max(0, deltaSegundos * 60));
+    try {
+      const deltaSegundos = Math.min(0.05, Math.max(0, (timestamp - (ultimoFrameExp || timestamp)) / 1000));
+      ultimoFrameExp = timestamp;
+      const dt60 = Math.min(3, Math.max(0, deltaSegundos * 60));
 
-    atualizarMovimentoExploracao(dt60);
-    atualizarInteracaoProxima();
-    atualizarCameraExploracao(dt60);
-    desenharJogadorExploracao(dt60);
-    atualizarEDesenharClima(dt60);
+      atualizarMovimentoExploracao(dt60);
+      atualizarInteracaoProxima();
+      atualizarCameraExploracao(dt60);
+      desenharJogadorExploracao(dt60);
+      atualizarEDesenharClima(dt60);
+    } catch (erro) {
+      // Nunca catch vazio: se o loop quebrar por algum motivo, o erro real
+      // vai pro console (em vez de travar tudo em silêncio), e o loop
+      // continua tentando o próximo frame.
+      console.error("Erro no loop de exploração:", erro);
+    }
 
     rafExploracaoId = requestAnimationFrame(loopExploracao);
   }
