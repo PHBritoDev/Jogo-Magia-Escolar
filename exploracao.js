@@ -764,7 +764,22 @@
   //    batalha em andamento).
   // ---------------------------------------------------------------------
   const camExp = { centerX: 0, centerY: 0, zoom: 0 };
-  const CAM_ZOOM = 0.92; // exploração não precisa de zoom dinâmico por distância (só 1 personagem)
+  // CORREÇÃO (fundo sumindo / elementos espalhados / escala errada): o zoom
+  // de 0.92 era aplicado via `element.style.zoom`, propriedade CSS NÃO
+  // padrão (fora da spec, sem suporte no Firefox, suporte inconsistente em
+  // WebViews). Ela reduz a CAIXA de #area-exploracao, mas os filhos (canvas
+  // de fundo, jogador, NPCs, decoração) são posicionados por JS com
+  // `left/top`/`transform: translate()` em pixels "de mundo" — quando o
+  // motor não propaga esse `zoom` da mesma forma pra dentro de um
+  // `<canvas>` e de elementos com `transform` próprio, o resultado é
+  // exatamente o relatado: a caixa do mundo encolhe (fundo cortado pelo
+  // `overflow:hidden`, parece "sumir"), enquanto o conteúdo interno segue
+  // desenhado nas coordenadas originais (não escaladas) → tudo parece
+  // deslocado/em escala errada. Em vez de reintroduzir QUALQUER escala em
+  // cima do elemento gigante de 3000x1600 (`zoom` ou `transform` — mesma
+  // causa raiz da tela preta original), a exploração passa a rodar em zoom
+  // fixo 1:1 — só pan (left/top), sem nenhuma escala do mundo inteiro.
+  const CAM_ZOOM = 1;
   const CAM_SUAVIZACAO_PAN = 0.10;
   let ultimoFrameCamExp = 0;
   // ETAPA 5 (item 10) — leve antecipação na direção do movimento: dá um
@@ -814,15 +829,16 @@
     // `transform:translate()scale()`. Um elemento desse tamanho sendo
     // transformado força o navegador a tentar rasterizar a camada inteira
     // numa textura de GPU — e em WebViews mais simples (como o do Acode)
-    // essa textura gigante simplesmente não é desenhada, mesmo com toda a
-    // lógica de câmera/viewport calculada certa por dentro. A troca abaixo
-    // usa posicionamento normal (`left`/`top`, sem GPU layer) e a
-    // propriedade `zoom` só pra escala — jogador, câmera, NPCs, prédios,
-    // Supabase etc. continuam exatamente iguais por dentro, só muda COMO
-    // essa camada é movida na tela.
+    // essa textura gigante simplesmente não é desenhada. A camada continua
+    // usando só posicionamento normal (`left`/`top`, sem GPU layer). A
+    // ÚNICA mudança desta correção: não escalamos mais essa camada gigante
+    // de jeito NENHUM (nem `transform`, nem a propriedade não padrão
+    // `zoom`, que foi a causa do fundo sumindo/elementos espalhados/escala
+    // errada — ver comentário em CAM_ZOOM acima). Câmera, pan, antecipação,
+    // parallax, jogador, NPCs, prédios, Supabase etc. continuam exatamente
+    // iguais por dentro, só não há mais nenhuma escala do mundo inteiro.
     area.style.left = offsetX + "px";
     area.style.top = offsetY + "px";
-    area.style.zoom = camExp.zoom;
 
     // Parallax leve do midground (camadas do mundo, item 6): a camada de estruturas
     // se desloca um pouco menos que o mundo real, reforçando profundidade.
